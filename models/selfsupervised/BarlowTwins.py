@@ -1,13 +1,15 @@
+import torch
 import tensorflow as tf
 import numpy as np
-try:
-	import wandb
-	from models.wandb_utils import *
-	wandb_flag = True
-except:
-	wandb_flag = False
-	print('Not using W&B')
+# try:
+# 	import wandb
+# 	from models.wandb_utils import *
+# 	wandb_flag = True
+# except:
+# 	wandb_flag = False
+# 	print('Not using W&B')
 
+wandb_flag = False
 # Evaluation and Visualization lib.
 from models.evaluation.latent_space import *
 from models.evaluation.features import *
@@ -32,20 +34,20 @@ from models.loss import *
 
 class RepresentationsPathology():
 	def __init__(self,
-				data,                       			# Dataset type, training, validation, and test data.
-				z_dim,	                    			# Latent space dimensions.
-				beta_1,                      			# Beta 1 value for Adam Optimizer.
-				learning_rate_e,             			# Learning rate Encoder.
-				lambda_=5e-3,							# Lambda weight for redundant representation penalty.
-				temperature=0.1,                        # Temperature for contrastive cosine similarity norm.
-				spectral=True,							# Spectral Normalization for weights.
-				layers=5,					 			# Number for layers for Encoder.
-				attention=28,                			# Attention Layer dimensions, default after height and width equal 28 to pixels.
-				power_iterations=1,          			# Iterations of the power iterative method: Calculation of Eigenvalues, Singular Values.
-				init = 'orthogonal',    			    # Weight Initialization: default Orthogonal.
-				regularizer_scale=1e-4,      			# Orthogonal regularization.
-				model_name='RepresentationsPathology'   # Model Name.
-				):
+				 data,                       			# Dataset type, training, validation, and test data.
+				 z_dim,	                    			# Latent space dimensions.
+				 beta_1,                      			# Beta 1 value for Adam Optimizer.
+				 learning_rate_e,             			# Learning rate Encoder.
+				 lambda_=5e-3,							# Lambda weight for redundant representation penalty.
+				 temperature=0.1,                        # Temperature for contrastive cosine similarity norm.
+				 spectral=True,							# Spectral Normalization for weights.
+				 layers=5,					 			# Number for layers for Encoder.
+				 attention=28,                			# Attention Layer dimensions, default after height and width equal 28 to pixels.
+				 power_iterations=1,          			# Iterations of the power iterative method: Calculation of Eigenvalues, Singular Values.
+				 init = 'orthogonal',    			    # Weight Initialization: default Orthogonal.
+				 regularizer_scale=1e-4,      			# Orthogonal regularization.
+				 model_name='RepresentationsPathology'   # Model Name.
+				 ):
 
 		### Input data variables.
 		self.image_height   = data.patch_h
@@ -114,11 +116,11 @@ class RepresentationsPathology():
 
 		# Spatial transformations.
 		if crop:
-		    images_trans = tf.map_fn(random_crop_and_resize_p075, images_trans)
+			images_trans = tf.map_fn(random_crop_and_resize_p075, images_trans) # likely best
 		if rotation:
 			images_trans = tf.map_fn(random_rotate, images_trans)
 		if flip:
-		    images_trans = random_flip(images_trans)
+			images_trans = random_flip(images_trans)
 
 		# Gaussian blur and noise transformations.
 		if g_blur:
@@ -130,15 +132,15 @@ class RepresentationsPathology():
 		if color_distort:
 			images_trans = tf.map_fn(random_color_jitter_1p0, images_trans)
 		else:
-			images_trans = tf_wrapper_rb_stain(images_trans)
+			images_trans = tf_wrapper_rb_stain(images_trans) # revisit
 
 		# Sobel filter.
 		if sobel_filter:
 			images_trans = tf.map_fn(random_sobel_filter, images_trans)
 
 		# Make sure the image batch is in the right format.
-		images_trans = tf.reshape(images_trans, [-1, self.image_height, self.image_width, self.image_channels])
-		images_trans = tf.clip_by_value(images_trans, 0., 1.)
+		images_trans = torch.reshape(images_trans, [-1, self.image_height, self.image_width, self.image_channels])
+		images_trans = torch.clamp(images_trans, 0., 1.)
 
 		return images_trans
 
@@ -147,33 +149,33 @@ class RepresentationsPathology():
 	def encoder(self, images, is_train, reuse, init, name, label_input=None):
 		if '_0' in self.model_name:
 			conv_space, h, z = encoder_resnet_contrastive(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
-															 is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
+														  is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
 		elif '_1' in self.model_name:
 			conv_space, h, z = encoder_resnet_contrastive_1(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
-															 is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
+															is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
 		elif '_2' in self.model_name:
 			conv_space, h, z = encoder_resnet_contrastive_2(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
-															 is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
+															is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
 		elif '_3' in self.model_name:
 			conv_space, h, z = encoder_resnet_contrastive_3(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
-															 is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
+															is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
 		elif '_4' in self.model_name:
 			conv_space, h, z = encoder_resnet_contrastive_4(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
-															 is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
+															is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
 		elif '_5' in self.model_name:
 			conv_space, h, z = encoder_resnet_contrastive_5(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
-															 is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
+															is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
 		elif '_6' in self.model_name:
 			conv_space, h, z = encoder_resnet_contrastive_6(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
-															 is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
+															is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
 		elif '_7' in self.model_name:
 			conv_space, h, z = encoder_resnet_contrastive_7(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
-															 is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
+															is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
 		return conv_space, h, z
 
 	# Loss Function.
 	def loss(self, rep_t1, rep_t2):
-		loss = cross_correlation_loss(z_a=rep_t1, z_b=rep_t2, lambda_=self.lambda_)
+		loss = cross_correlation_loss(z_a=rep_t1, z_b=rep_t2, lambda_=self.lambda_) #revisit
 		return loss
 
 	# Optimizer.
@@ -194,13 +196,13 @@ class RepresentationsPathology():
 	# Build the Self-supervised.
 	def build_model(self):
 
-		from tensorflow.python.client import device_lib
-		local_device_protos = device_lib.list_local_devices()
-		avail_gpus = [x.name for x in local_device_protos if x.device_type == 'GPU']
+		# from tensorflow.python.client import device_lib
+		# local_device_protos = device_lib.list_local_devices()
+		avail_gpus = [torch.cuda.device(i) for i in range(torch.cuda.device_count())]
 
 		################### INPUTS & DATA AUGMENTATION #####################################################################################################################################
 		# Inputs.
-		self.real_images_1, self.real_images_2, self.transf_real_images_1, self.transf_real_images_2, self.learning_rate_input_e = self.model_inputs()
+		self.real_images_1, self.real_images_2, self.transf_real_images_1, self.transf_real_images_2, self.learning_rate_input_e = self.model_inputs() # likely not needed as pytoch doesn't need placeholders
 		# Data augmentation layer.
 		self.real_images_1_t1 = self.data_augmentation_layer(images=self.real_images_1, crop=self.crop, rotation=self.rotation, flip=self.flip, g_blur=self.g_blur, g_noise=self.g_noise,
 															 color_distort=self.color_distort, sobel_filter=self.sobel_filter)
@@ -222,7 +224,7 @@ class RepresentationsPathology():
 		# Optimizers.
 		self.train_encoder  = self.optimization()
 
-	def project_subsample(self, session, data, epoch, data_out_path, report, batch_size=50):
+	def project_subsample(self, session, data, epoch, data_out_path, report, batch_size=50): # uses data
 		# Updated
 		if not report:
 			return
@@ -273,7 +275,7 @@ class RepresentationsPathology():
 
 
 	# Training function.
-	def train(self, epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=None, report=False):
+	def train(self, epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=None, report=False): # uses data
 
 		if self.wandb_flag:
 			train_config = save_model_config(self, data)
@@ -281,7 +283,7 @@ class RepresentationsPathology():
 			wandb.init(project='SSL Pathology', entity='adalbertocquiros', name=run_name, config=train_config)
 
 		run_epochs = 0
-		saver = tf.train.Saver()
+		saver = tf.train.Saver() # revisit
 
 		# Setups.
 		checkpoints, csvs = setup_output(data_out_path=data_out_path, model_name=self.model_name, restore=restore)
@@ -291,7 +293,7 @@ class RepresentationsPathology():
 
 		# Session Options.
 		# config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
-		config = tf.ConfigProto(allow_soft_placement=True)
+		config = tf.ConfigProto(allow_soft_placement=True) # revisit
 		config.gpu_options.allow_growth = True
 		run_options = tf.RunOptions(report_tensor_allocations_upon_oom=True)
 
@@ -345,13 +347,13 @@ class RepresentationsPathology():
 							output_layers_transformed = [self.real_images_1_t1, self.real_images_1_t2]
 							transformed_images = session.run(output_layers_transformed, feed_dict=feed_dict, options=run_options)
 							feed_dict = {self.transf_real_images_1:transformed_images[0], self.transf_real_images_2:transformed_images[1], \
-									self.real_images_1:batch_images, self.real_images_2:batch_images, self.learning_rate_input_e: self.learning_rate_e}
+										 self.real_images_1:batch_images, self.real_images_2:batch_images, self.learning_rate_input_e: self.learning_rate_e}
 							val_outputs = session.run(model_outputs, feed_dict=feed_dict, options=run_options)
 
 							update_csv(model=self, file=csvs[0], variables=[epoch_outputs[0], val_outputs[0]], epoch=epoch, iteration=run_epochs, losses=losses)
 							if self.wandb_flag: wandb.log({'Redundancy Reduction Loss Train': epoch_outputs[0], 'Redundancy Reduction Loss Validation': val_outputs[0],})
 							break
-						
+
 					run_epochs += 1
 					if epoch==0: break
 
