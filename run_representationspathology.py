@@ -26,7 +26,7 @@ parser.add_argument('--report',        dest='report',        action='store_true'
 args           = parser.parse_args()
 epochs         = args.epochs
 batch_size     = args.batch_size
-dataset        = args.dataset
+dataset        = args.set
 marker         = args.marker
 image_width    = args.img_size
 image_height   = args.img_size
@@ -61,7 +61,7 @@ beta_1            = 0.5
 # Model Architecture param.
 layers_map = {512:7, 448:6, 256:6, 224:5, 128:5, 112:4, 56:3, 28:2}
 layers     = layers_map[image_height]
-spectral   = False
+spectral   = True
 attention  = 56
 init       = 'xavier'
 # init       = 'orthogonal'

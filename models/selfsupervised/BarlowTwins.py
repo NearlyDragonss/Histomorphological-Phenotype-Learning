@@ -95,11 +95,14 @@ class RepresentationsPathology():
 		self.build_model()
 
 	# Self-supervised inputs.
-	def model_inputs(self):
+	def model_inputs(self, data):
 
 		# Image input for transformation.
 		real_images_1 = tf.placeholder(dtype=tf.float32, shape=(None, self.image_width, self.image_height, self.image_channels), name='real_images_1')
 		real_images_2 = tf.placeholder(dtype=tf.float32, shape=(None, self.image_width, self.image_height, self.image_channels), name='real_images_2')
+
+		real_images_1 = torch.tensor()
+
 
 		# Transformed images.
 		transf_real_images_1 = tf.placeholder(dtype=tf.float32, shape=(self.batch_size, self.image_width, self.image_height, self.image_channels), name='transf_real_images_1')
@@ -298,6 +301,29 @@ class RepresentationsPathology():
 		run_options = tf.RunOptions(report_tensor_allocations_upon_oom=True)
 
 		print('Starting run.')
+		# Pytorch
+		if self.wandb_flag: wandb.tensorflow.log(tf.summary.merge_all())
+		# Example of augmentation images.
+		batch_images, batch_labels = data.training.next_batch(n_images)
+		data.training.reset()
+		feed_dict = {self.real_images_1:batch_images, self.real_images_2:batch_images} # data feed with placeholder:data strcuture
+		output_layers_transformed = [self.real_images_1_t1, self.real_images_1_t2] # list of augmented tensors
+		transformed_images = session.run(output_layers_transformed, feed_dict=feed_dict, options=run_options)
+		# instead of above call, call all augmentations with any configs applied
+		self.real_images_1_t1 = self.data_augmentation_layer(images=feed_dict[self.real_images_1], crop=self.crop, rotation=self.rotation, flip=self.flip, g_blur=self.g_blur, g_noise=self.g_noise,
+															 color_distort=self.color_distort, sobel_filter=self.sobel_filter)
+
+
+
+
+
+		write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_1.png'), data=transformed_images[0], metadata=False)
+		write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_2.png'), data=transformed_images[1], metadata=False)
+		if self.wandb_flag:
+			dict_ = {"transformed_1": wandb.Image(os.path.join(data_out_path, 'images/transformed_1.png')), "transformed_2": wandb.Image(os.path.join(data_out_path, 'images/transformed_2.png'))}
+			wandb.log(dict_)
+
+
 		# Training session.
 		with tf.Session(config=config) as session:
 			if self.wandb_flag: wandb.tensorflow.log(tf.summary.merge_all())
