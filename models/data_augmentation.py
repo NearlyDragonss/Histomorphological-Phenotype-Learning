@@ -9,6 +9,16 @@ import numpy as np
 import functools
 import random
 
+# Transforms elems by applying fn to each element unstacked on axis 0 - copying tf.map_fn functionality
+def map_func(func, tensor):
+    unstacked_tensor = torch.unbind(tensor, dim=0)
+    tensor_to_stack = []
+    for slice in unstacked_tensor:
+        tensor_to_stack.append(func(slice))
+    transformed_tensor = torch.stack(tensor_to_stack, dim=0)
+    return transformed_tensor
+
+
 # Random sampling to recide if the transformation is applied.
 def random_apply(func, p, x):
     return torch.cond(torch.less(torch.rand([], dtype=tf.float32), p.type(torch.float32)), lambda: func(x), lambda: x) # might have issues due to torch.cond

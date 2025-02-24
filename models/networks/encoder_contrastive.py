@@ -3,6 +3,7 @@ from models.activations import *
 from models.ops import *
 import tensorflow as tf
 import numpy as np
+from torch import nn
 
 display = True
 
@@ -329,7 +330,7 @@ def encoder_resnet_contrastive(images, z_dim, h_dim, layers, spectral, activatio
 		print('Attention:  ', attention)
 		print()
 
-	with tf.variable_scope(name, reuse=reuse):
+	with tf.variable_scope(name, reuse=reuse): # todo: look into
 
 		for layer in range(layers):
 			# ResBlock.
@@ -344,8 +345,10 @@ def encoder_resnet_contrastive(images, z_dim, h_dim, layers, spectral, activatio
 			net = activation(net)
 		
 		# Feature space extraction
-		conv_space = tf.layers.max_pooling2d(inputs=net, pool_size=[2, 2], strides=[2,2])
-		conv_space = tf.layers.flatten(inputs=conv_space)
+		max_pool = nn.MaxPool2d(pool_size=2, stride=2)
+		conv_space = max_pool(net)
+		flatten = nn.Flatten() # todo: check is correct
+		conv_space = flatten(conv_space)
 
 		# Flatten.
 		net = tf.layers.flatten(inputs=net)

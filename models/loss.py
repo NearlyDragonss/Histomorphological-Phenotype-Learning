@@ -3,6 +3,7 @@ from models.activations import *
 import tensorflow as tf
 import numpy as np
 import sys
+import torch
 
 def realness_loss(features_fake, features_real, anchor_0, anchor_1, v_max=1., v_min=-1., relativistic=True, discriminator=None, real_images=None, fake_images=None, init=None, gp_coeff=None, dis_name='discriminator'):
 
@@ -317,30 +318,30 @@ def byol_loss(prediction, z_rep):
 
 def cross_correlation_loss(z_a, z_b, lambda_):
     def normalize_repr(z):
-        z_norm = (z - tf.reduce_mean(z, axis=0)) / tf.math.reduce_std(z, axis=0)
+        z_norm = (z - torch.mean(z, axis=0)) / torch.std(z, dim=0)
         return z_norm
 
     def off_diagonal(x):
-        n = tf.shape(x)[0]
-        flattened = tf.reshape(x, [-1])[:-1]
-        off_diagonals = tf.reshape(flattened, (n-1, n+1))[:, 1:]
-        return tf.reshape(off_diagonals, [-1])
+        n = torch.Tensor.size(x)[0]
+        flattened = torch.reshape(x, [-1])[:-1]
+        off_diagonals = torch.reshape(flattened, (n-1, n+1))[:, 1:]
+        return torch.reshape(off_diagonals, [-1])
 
-    batch_size = tf.cast(tf.shape(z_a)[0], z_a.dtype)
-    repr_dim = tf.shape(z_a)[1]
+    batch_size = torch.Tensor.size(z_a)[0].type(z_a.dtype)
+    repr_dim = torch.Tensor.size(z_a)[1]
 
     # Batch normalize representations
     z_a_norm = normalize_repr(z_a)
     z_b_norm = normalize_repr(z_b)
 
     # Cross-correlation matrix.
-    c = tf.matmul(z_a_norm, z_b_norm, transpose_a=True) / batch_size
+    c = torch.matmul(torch.t(z_a_norm), z_b_norm,) / batch_size
 
-    inv_term    = tf.linalg.diag_part(c)
-    on_diag     = tf.reduce_sum(tf.pow(1-inv_term, 2))
+    inv_term    = torch.diag(c,0) # todo: check this is correct # https://stackoverflow.com/questions/70381758/equivalent-of-tf-linalg-diag-part-in-pytorch
+    on_diag     = torch.sum(torch.pow(1-inv_term, 2))
 
-    redred_term = (tf.ones_like(c)-tf.eye(repr_dim))*c
-    off_diag    = tf.reduce_sum(tf.pow(redred_term, 2))
+    redred_term = (torch.ones_like(c)-torch.eye(repr_dim))*c
+    off_diag    = torch.sum(torch.pow(redred_term, 2))
 
     loss = on_diag + (lambda_ * off_diag)
     return loss
