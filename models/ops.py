@@ -1,20 +1,21 @@
 from models.activations import *
 import tensorflow as tf
 import numpy as np
+import torch
 
 # StyleGAN: Apply a weighted input noise to a layer.
 def noise_input(inputs, scope):
-    with tf.variable_scope('noise_input_%s' % scope):
+    with tf.variable_scope('noise_input_%s' % scope): # todo: revisit
 
         # Scale per channel as mentioned in the paper.
         if len(inputs.shape) == 2:
-            noise_shape = [tf.shape(inputs)[0], inputs.shape[1]]
+            noise_shape = [torch.Tensor.size(inputs)[0], inputs.shape[1]]
         else:
-            noise_shape = [tf.shape(inputs)[0], 1, 1, inputs.shape[3]]
-        noise = tf.random_normal(noise_shape)
-        weights = tf.get_variable('noise_weights', shape=inputs.shape[-1], initializer=tf.contrib.layers.xavier_initializer())
+            noise_shape = [torch.Tensor.size(inputs)[0], 1, 1, inputs.shape[3]]
+        noise = torch.normal(mean=0.0, std=1.0, size=noise_shape)
+        weights = tf.get_variable('noise_weights', shape=inputs.shape[-1], initializer=tf.contrib.layers.xavier_initializer()) # todo: revisit
 
-        outputs = inputs + tf.multiply(weights, noise)
+        outputs = inputs + torch.mul(weights, noise)
 
     return outputs
 
@@ -50,8 +51,8 @@ def style_extract(inputs, latent_dim, spectral, init, regularizer, scope, power_
     
 
 def style_extract_2(inputs, latent_dim, spectral, init, regularizer, scope, power_iterations=1):
-    with tf.variable_scope('style_extract_%s' % scope) :
-        means = tf.reduce_mean(inputs, axis=[1,2], keep_dims=True)
+    with tf.variable_scope('style_extract_%s' % scope) : # todo: revisit
+        means = tf.reduce_mean(inputs, axis=[1,2], keep_dims=True) # todo: revisit
         stds  = tf.sqrt(tf.reduce_mean((inputs-means)**2, axis=[1,2], keep_dims=True))
         means = tf.reduce_mean(means, axis=[1,2])
         stds  = tf.reduce_mean(stds, axis=[1,2])
@@ -104,10 +105,10 @@ def attention_block(x, scope, spectral=True, init='xavier', regularizer=None, po
 def attention_block_2(x, scope, spectral=True, init='xavier', regularizer=None, power_iterations=1, display=True):
 
     batch_size, height, width, channels = x.get_shape().as_list()
-    with tf.variable_scope('attention_block_2_%s' % scope):
+    with tf.variable_scope('attention_block_2_%s' % scope): # todo: revisit
 
         # Global value for all pixels, measures how important is the context for each of them.
-        gamma = tf.get_variable('gamma', shape=(1), initializer=tf.constant_initializer(0.0))
+        gamma = tf.get_variable('gamma', shape=(1), initializer=tf.constant_initializer(0.0)) # todo: revisit
         f_g_channels = channels//8
         h_channels = channels//2
 
@@ -200,21 +201,21 @@ def spectral_normalization(filter, power_iterations):
     return filter_normalized
 
 
-def convolutional(inputs, output_channels, filter_size, stride, padding, conv_type, scope, init='xavier', init_std=None, regularizer=None, data_format='NHWC', output_shape=None, spectral=False, 
+def convolutional(inputs, output_channels, filter_size, stride, padding, conv_type, scope, init='xavier', init_std=None, regularizer=None, data_format='NHWC', output_shape=None, spectral=False,
                   power_iterations=1, use_bias=True, display=True):
-    with tf.variable_scope('conv_layer_%s' % scope):
+    with tf.variable_scope('conv_layer_%s' % scope): # todo: look into
         # Weight Initlializer.
         if init=='normal':
             if init_std is None:
-                weight_init = tf.initializers.random_normal(stddev=0.02)
+                weight_init = torch.nn.init.normal_(mean=0, std=torch.tensor(0.02)) # todo: figure out input tensors
             else:
-                weight_init = tf.initializers.random_normal(stddev=0.02)
+                weight_init = torch.nn.init.normal_(mean=0, std=torch.tensor(0.02)) # todo: figure out input tensors
         elif init=='orthogonal':
-            weight_init = tf.initializers.orthogonal()
+            weight_init = torch.nn.init.orthogonal() # todo: figure out input tensors
         elif init=='glorot_uniform':
-            weight_init = tf.initializers.glorot_uniform()
+            weight_init = torch.nn.init.xavier_uniform_() # todo: figure out input tensors
         else:
-            weight_init = tf.contrib.layers.xavier_initializer_conv2d()
+            weight_init = torch.nn.init.xavier_normal_() # todo: figure out input tensors
 
         # Shapes.
         current_shape = inputs.get_shape()
@@ -223,29 +224,29 @@ def convolutional(inputs, output_channels, filter_size, stride, padding, conv_ty
         else: filter_shape = (filter_size, filter_size, input_channels, output_channels)    
 
         # Weight and Bias Initialization.
-        bias = tf.get_variable(name='bias', shape=[output_channels], initializer=tf.constant_initializer(0.0), trainable=True, dtype=tf.float32) 
+        bias = tf.get_variable(name='bias', shape=[output_channels], initializer=tf.constant_initializer(0.0), trainable=True, dtype=tf.float32) # todo: revisit https://stackoverflow.com/questions/64390904/how-can-i-extract-the-weight-and-bias-of-linear-layers-in-pytorch
         filter = tf.get_variable(name='filter_conv', shape=filter_shape, initializer=weight_init, trainable=True, dtype=tf.float32, regularizer=regularizer)    
         
        # Type of convolutional operation.
         if conv_type == 'upscale':
-            output_shape = [tf.shape(inputs)[0], current_shape[1]*2, current_shape[2]*2, output_channels]
+            output_shape = [torch.Tensor.size(inputs)[0], current_shape[1]*2, current_shape[2]*2, output_channels]
             # Weight filter initializer.
-            filter = tf.pad(filter, ([1,1], [1,1], [0,0], [0,0]), mode='CONSTANT')
-            filter = tf.add_n([filter[1:,1:], filter[:-1,1:], filter[1:,:-1], filter[:-1,:-1]])
+            filter = torch.nn.functional.pad(filter, (1,1, 1,1, 0,0, 0,0), mode='constant') # todo: check is correct
+            filter = filter[1:,1:] + filter[:-1,1:] + filter[1:,:-1] + filter[:-1,:-1]
             if spectral: filter = spectral_normalization(filter, power_iterations)
             strides = [1, 2, 2, 1]
-            output = tf.nn.conv2d_transpose(value=inputs, filter=filter, output_shape=tf.stack(output_shape), strides=strides, padding=padding, data_format=data_format)
+            output = tf.nn.conv2d_transpose(value=inputs, filter=filter, output_shape=tf.stack(output_shape), strides=strides, padding=padding, data_format=data_format) # todo: revisit
             
         elif conv_type == 'downscale':
             # Weight filter initializer.
-            filter = tf.pad(filter, ([1,1], [1,1], [0,0], [0,0]), mode='CONSTANT')
-            filter = tf.add_n([filter[1:,1:], filter[:-1,1:], filter[1:,:-1], filter[:-1,:-1]])
+            filter = torch.nn.functional.pad(filter, (1,1, 1,1, 0,0, 0,0), mode='constant') # todo: check is correct
+            filter = filter[1:,1:] + filter[:-1,1:] + filter[1:,:-1] + filter[:-1,:-1]
             if spectral: filter = spectral_normalization(filter, power_iterations)
             strides = [1, 2, 2, 1]
             output = tf.nn.conv2d(input=inputs, filter=filter, strides=strides, padding=padding, data_format=data_format)
             
         elif conv_type == 'transpose':
-            output_shape = [tf.shape(inputs)[0], current_shape[1]*stride, current_shape[2]*stride, output_channels]
+            output_shape = [torch.Tensor.size(inputs)[0], current_shape[1]*stride, current_shape[2]*stride, output_channels]
             strides = [1, stride, stride, 1]
             if spectral: filter = spectral_normalization(filter, power_iterations)
             output = tf.nn.conv2d_transpose(value=inputs, filter=filter, output_shape=tf.stack(output_shape), strides=strides, padding=padding, data_format=data_format)
@@ -256,7 +257,7 @@ def convolutional(inputs, output_channels, filter_size, stride, padding, conv_ty
             output = tf.nn.conv2d(input=inputs, filter=filter, strides=strides, padding=padding, data_format=data_format)
         
         if use_bias:
-            output = tf.nn.bias_add(output, bias, data_format=data_format)
+            output = tf.nn.bias_add(output, bias, data_format=data_format) # todo: revisit
 
     if display:
         print('Conv Layer:     Scope=%15s Channels %5s Filter_size=%2s  Stride=%2s Padding=%6s Conv_type=%15s Output Shape: %s' % 
@@ -266,26 +267,26 @@ def convolutional(inputs, output_channels, filter_size, stride, padding, conv_ty
 
 def dense(inputs, out_dim, scope, use_bias=True, spectral=False, power_iterations=1, init='xavier', regularizer=None, display=True):
     if init=='normal':
-        weight_init = tf.initializers.random_normal(stddev=0.02)
+        weight_init = torch.nn.init.normal_(stddev=0.02)
     elif init=='orthogonal':
-        weight_init = tf.initializers.orthogonal()
+        weight_init = `torch.nn.init.orthogonal`()
     elif init=='glorot_uniform':
-        weight_init = tf.initializers.glorot_uniform()
+        weight_init = torch.nn.init.xavier_uniform_()
     else:
-        weight_init = tf.contrib.layers.xavier_initializer()
+        weight_init = torch.nn.init.xavier_normal_()
 
     with tf.variable_scope('dense_layer_%s' % scope):
         in_dim = inputs.get_shape()[-1]
         weights = tf.get_variable('filter_dense', shape=[in_dim, out_dim], dtype=tf.float32, trainable=True, initializer=weight_init, regularizer=regularizer)
         
         if spectral:
-            output = tf.matmul(inputs, spectral_normalization(weights, power_iterations))
+            output = torch.matmul(inputs, spectral_normalization(weights, power_iterations))
         else:
-            output = tf.matmul(inputs, weights)
+            output = torch.matmul(inputs, weights)
         
         if use_bias : 
             bias = tf.get_variable('bias', [out_dim], initializer=tf.constant_initializer(0.0), trainable=True, dtype=tf.float32)
-            output = tf.add(output, bias)
+            output = torch.add(output, bias)
 
     if display:
         print('Dens Layer:     Scope=%15s Channels %5s Output Shape: %s' % 

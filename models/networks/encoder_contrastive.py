@@ -34,11 +34,14 @@ def encoder_resnet_contrastive_6(images, z_dim, h_dim, layers, spectral, activat
 			net = activation(net)
 		
 		# Feature space extraction
-		conv_space = tf.layers.max_pooling2d(inputs=net, pool_size=[2, 2], strides=[2,2])
-		conv_space = tf.layers.flatten(inputs=conv_space)
+		max_pool = nn.MaxPool2d(pool_size=2, stride=2)
+		conv_space = max_pool(net)
+		flatten = nn.Flatten() # todo: check is correct
+		conv_space = flatten(conv_space)
 
 		# Flatten.
-		net = tf.layers.flatten(inputs=net)
+		flatten = nn.Flatten()
+		net = flatten(net)
 
 		# H Representation Layer.
 		net = dense(inputs=net, out_dim=channels[-1], spectral=spectral, init=init, regularizer=regularizer, scope='h_rep')				
@@ -88,11 +91,14 @@ def encoder_resnet_contrastive_2(images, z_dim, h_dim, layers, spectral, activat
 			net = activation(net)
 		
 		# Feature space extraction
-		conv_space = tf.layers.max_pooling2d(inputs=net, pool_size=[2, 2], strides=[2,2])
-		conv_space = tf.layers.flatten(inputs=conv_space)
+		max_pool = nn.MaxPool2d(pool_size=2, stride=2)
+		conv_space = max_pool(net)
+		flatten = nn.Flatten() # todo: check is correct
+		conv_space = flatten(conv_space)
 
 		# Flatten.
-		net = tf.layers.flatten(inputs=net)
+		flatten = nn.Flatten()
+		net = flatten(net)
 
 		# H Representation Layer.
 		net = dense(inputs=net, out_dim=channels[-1], spectral=spectral, init=init, regularizer=regularizer, scope='h_rep')				
@@ -140,11 +146,14 @@ def encoder_resnet_contrastive_1(images, z_dim, h_dim, layers, spectral, activat
 			net = activation(net)
 		
 		# Feature space extraction
-		conv_space = tf.layers.max_pooling2d(inputs=net, pool_size=[2, 2], strides=[2,2])
-		conv_space = tf.layers.flatten(inputs=conv_space)
+		max_pool = nn.MaxPool2d(pool_size=2, stride=2)
+		conv_space = max_pool(net)
+		flatten = nn.Flatten() # todo: check is correct
+		conv_space = flatten(conv_space)
 
 		# Flatten.
-		net = tf.layers.flatten(inputs=net)
+		flatten = nn.Flatten()
+		net = flatten(net)
 
 		# H Representation Layer.
 		net = dense(inputs=net, out_dim=channels[-1], spectral=spectral, init=init, regularizer=regularizer, scope='h_rep')				
@@ -194,11 +203,14 @@ def encoder_resnet_contrastive_3(images, z_dim, h_dim, layers, spectral, activat
 			net = activation(net)
 		
 		# Feature space extraction
-		conv_space = tf.layers.max_pooling2d(inputs=net, pool_size=[2, 2], strides=[2,2])
-		conv_space = tf.layers.flatten(inputs=conv_space)
+		max_pool = nn.MaxPool2d(pool_size=2, stride=2)
+		conv_space = max_pool(net)
+		flatten = nn.Flatten() # todo: check is correct
+		conv_space = flatten(conv_space)
 
 		# Flatten.
-		net = tf.layers.flatten(inputs=net)
+		flatten = nn.Flatten()
+		net = flatten(net)
 
 		# H Representation Layer.
 		net = dense(inputs=net, out_dim=channels[-1], spectral=spectral, init=init, regularizer=regularizer, scope='h_rep')				
@@ -244,11 +256,14 @@ def encoder_resnet_contrastive_4(images, z_dim, h_dim, layers, spectral, activat
 			net = activation(net)
 		
 		# Feature space extraction
-		conv_space = tf.layers.max_pooling2d(inputs=net, pool_size=[2, 2], strides=[2,2])
-		conv_space = tf.layers.flatten(inputs=conv_space)
+		max_pool = nn.MaxPool2d(pool_size=2, stride=2)
+		conv_space = max_pool(net)
+		flatten = nn.Flatten() # todo: check is correct
+		conv_space = flatten(conv_space)
 
 		# Flatten.
-		net = tf.layers.flatten(inputs=net)
+		flatten = nn.Flatten()
+		net = flatten(net)
 
 		# H Representation Layer.
 		net = dense(inputs=net, out_dim=channels[-1], spectral=spectral, init=init, regularizer=regularizer, scope='h_rep')				
@@ -297,11 +312,14 @@ def encoder_resnet_contrastive_5(images, z_dim, h_dim, layers, spectral, activat
 			net = activation(net)
 		
 		# Feature space extraction
-		conv_space = tf.layers.max_pooling2d(inputs=net, pool_size=[2, 2], strides=[2,2])
-		conv_space = tf.layers.flatten(inputs=conv_space)
+		max_pool = nn.MaxPool2d(pool_size=2, stride=2)
+		conv_space = max_pool(net)
+		flatten = nn.Flatten() # todo: check is correct
+		conv_space = flatten(conv_space)
 
 		# Flatten.
-		net = tf.layers.flatten(inputs=net)
+		flatten = nn.Flatten()
+		net = flatten(net)
 
 		# H Representation Layer.
 		net = dense(inputs=net, out_dim=channels[-1], spectral=spectral, init=init, regularizer=regularizer, scope='h_rep')				
@@ -351,7 +369,8 @@ def encoder_resnet_contrastive(images, z_dim, h_dim, layers, spectral, activatio
 		conv_space = flatten(conv_space)
 
 		# Flatten.
-		net = tf.layers.flatten(inputs=net)
+		flatten = nn.Flatten()
+		net = flatten(net)
 
 		# H Representation Layer.
 		net = dense(inputs=net, out_dim=channels[-1], spectral=spectral, init=init, regularizer=regularizer, scope='h_rep')				
@@ -402,11 +421,15 @@ def encoder_resnet_contrastive_7(images, z_dim, h_dim, layers, spectral, activat
 			net = activation(net)
 		
 		# Feature space extraction
-		conv_space = tf.layers.max_pooling2d(inputs=net, pool_size=[2, 2], strides=[2,2])
-		conv_space = tf.layers.flatten(inputs=conv_space)
+		max_pool = nn.MaxPool2d(pool_size=2, stride=2)
+		conv_space = max_pool(net)
+		flatten = nn.Flatten() # todo: check is correct
+		conv_space = flatten(conv_space)
+
 
 		# Flatten.
-		net = tf.layers.flatten(inputs=net)
+		flatten = nn.Flatten()
+		net = flatten(net)
 
 		# H Representation Layer.
 		net = dense(inputs=net, out_dim=channels[-1], spectral=spectral, init=init, regularizer=regularizer, scope='h_rep')				
