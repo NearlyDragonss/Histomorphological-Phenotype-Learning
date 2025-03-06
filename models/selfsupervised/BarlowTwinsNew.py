@@ -145,7 +145,7 @@ class RepresentationsPathology():
 
     # Encoder Network.
     def encoder(self, images, is_train, reuse, init, name, label_input=None):
-        # todo: translate encoder
+        # todo: check that it all works
         if '_0' in self.model_name:
             conv_space, h, z = encoder_resnet_contrastive(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
                                                           is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
@@ -180,6 +180,27 @@ class RepresentationsPathology():
 
     # Optimizer.
     def optimization(self):
+        # todo: translate
+        # below is like a dictionary which has custom functions within it
+        with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)): # specifies control dependancies, returnss a list of values with the name tf.GraphKeys.UPDATE_OPS
+            # Learning rate decay.
+            # todo: might need to make global
+            global_step = torch.Tensor(0, requires_grad=False) # creates a tensor that maintains shared, persisitent state that can be manipulated by the program
+            self.lr_decayed_fn = tf.train.polynomial_decay(learning_rate=self.learning_rate_input_e, global_step=global_step, decay_steps=3*self.num_samples, end_learning_rate=0.1*self.learning_rate_input_e,
+                                                           power=0.5)
+            #  Optimizer
+            opt = tf.train.AdamOptimizer(learning_rate=self.learning_rate_input_e, beta1=self.beta_1)
+            # opt = torch.optim.Adam(params=None, lr=self.learning_rate_e, betas=(self.beta_1,0.999)) #todo: set params
+            # Quick dirty optimizer for Encoder.
+            trainable_variables = tf.trainable_variables()
+            encoder_variables = [variable for variable in trainable_variables if variable.name.startswith('contrastive_encoder')]
+            train_encoder = opt.minimize(self.loss_contrastive, var_list=encoder_variables)
+
+            # Learning rate decay
+            torch.optim.lr_scheduler.PolynomialLR(optimizer=opt, )
+
+
+        return train_encoder
         pass
 
     # Build the Self-supervised.
@@ -205,7 +226,6 @@ class RepresentationsPathology():
         # Optimizers.
         self.train_encoder  = self.optimization()
 
-    pass
 
     def project_subsample(self, session, data, epoch, data_out_path, report, batch_size=50): # uses data
         pass
@@ -234,7 +254,7 @@ class RepresentationsPathology():
         feed_dict = {self.real_images_1:batch_images, self.real_images_2:batch_images}
         output_layers_transformed = [self.real_images_1_t1, self.real_images_1_t2]
 
-        build_model(batch_images)
+        self.build_model(batch_images)
 
 
 

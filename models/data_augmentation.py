@@ -2,7 +2,7 @@ from configparser import Interpolation
 
 import torch
 import torchvision.transforms
-from torchvision.transforms import v2, functional as f, InterpolationMode
+from torchvision.transforms import v2, functional as f, InterpolationMode, RandomResizedCrop
 from skimage import color, io
 import tensorflow as tf
 import numpy as np
@@ -129,17 +129,20 @@ def random_color_jitter_1p0(image, p=1.0, impl='simclrv2'):
 
 # Crop.
 def distorted_bounding_box_crop(image, bbox, min_object_covered=0.1, aspect_ratio_range=(0.75, 1.33), area_range=(0.05, 1.0), max_attempts=100, scope=None):
-    # with tf.name_scope(scope, 'distorted_bounding_box_crop', [image, bbox]): # revisit
-    shape = torch.Tensor.size(image)
-    sample_distorted_bounding_box = tf.image.sample_distorted_bounding_box(shape, bounding_boxes=bbox, min_object_covered=min_object_covered, aspect_ratio_range=aspect_ratio_range,
-                                                                           area_range=area_range, max_attempts=max_attempts, use_image_if_no_bounding_boxes=True) # todo:
-    bbox_begin, bbox_size, _ = sample_distorted_bounding_box
+    # with tf.name_scope(scope, 'distorted_bounding_box_crop', [image, bbox]): # todo: revisit
 
-    # Crop the image to the specified bounding box.
-    offset_y, offset_x, _ = torch.unbind(bbox_begin) # todo: tf.unstack -> torch.unbind right?
-    target_height, target_width, _ = torch.unbind(bbox_size)
-    image = tf.image.crop_to_bounding_box(image, offset_y, offset_x, target_height, target_width) # todo: return to this
+    # get dimentions from bbox
+    bbox_dimentions = bbox[0,0]
+    y_min = bbox_dimentions[0]
+    x_min = bbox_dimentions[1]
+    y_max = bbox_dimentions[2]
+    x_max = bbox_dimentions[3]
+    object_region = image[:, y_min:y_max, x_min:x_max]
+    bbox_height = y_max-y_min
+    bbox_width = x_max - x_min
 
+    # Resizes and crops based on bbox parameters
+    image = torchvision.transforms.RandomResizedCrop(size=(bbox_height, bbox_width), ratio=aspect_ratio_range.toTuple(), scale=(min_object_covered, 1.0))
     return image
 
 # Crop and resize image.
@@ -204,12 +207,12 @@ def random_flip(image):
 
 ############### BLUR ###############
 
-def gaussian_blur(image, kernel_size, sigma, padding='SAME'):
+def gaussian_blur(image, kernel_size, sigma, padding='same'):
     radius = (kernel_size/2).type(torch.int32)
-    kernel_size = radius * 2 + 1
-    x = (torch.arange(-radius, radius + 1)).type(torch.float)
-    blur_filter = torch.exp(-torch.pow(x, 2.0) / (2.0 * torch.pow(sigma.type(torch.float), 2.0)))
-    blur_filter /= torch.sum(blur_filter)
+    kernel_size = radius * 2 + 1 # number
+    x = (torch.arange(-radius, radius + 1)).type(torch.float) # shape = [1,2,3,4,4,54,45,3]
+    blur_filter = torch.exp(-torch.pow(x, 2.0) / (2.0 * torch.pow(sigma.type(torch.float), 2.0))) # an exponant number
+    blur_filter /= torch.sum(blur_filter) # a number
 
     # One vertical and one horizontal filter.
     blur_v = torch.reshape(blur_filter, [kernel_size, 1, 1, 1])
@@ -221,9 +224,9 @@ def gaussian_blur(image, kernel_size, sigma, padding='SAME'):
     if expand_batch_dim:
         # Tensorflow requires batched input to convolutions, which we can fake with
         # an extra dimension.
-        image = tf.expand_dims(image, axis=0) # todo: revisit
-    blurred = tf.nn.depthwise_conv2d(image,   blur_h, strides=[1, 1, 1, 1], padding=padding) # todo: revisit
-    blurred = tf.nn.depthwise_conv2d(blurred, blur_v, strides=[1, 1, 1, 1], padding=padding)
+        image = image.expand(1, list(image.size())[0]) # todo: could be wrong
+    blurred = torch.nn.functional.conv2d(image, blur_h, stride=(1,1,1,1), padding=padding)
+    blurred = torch.nn.functional.conv2d(blurred, blur_v, stride=(1,1,1,1), padding=padding)
     if expand_batch_dim:
         blurred = torch.squeeze(blurred, dim=0)
     return blurred
@@ -233,7 +236,7 @@ def random_blur(image, p=0.5):
     del width
     def _transform(image):
         sigma = (2.0-0.1)*torch.rand([], dtype=torch.float32) + 0.1
-        return gaussian_blur(image, kernel_size=height//10, sigma=sigma, padding='SAME')
+        return gaussian_blur(image, kernel_size=height//10, sigma=sigma, padding='same')
     return random_apply(_transform, p=p, x=image)
 
 
@@ -242,9 +245,10 @@ def random_blur(image, p=0.5):
 # Adds gaussian noise to an image.
 def add_gaussian_noise(image):
     # image must be scaled in [0, 1]
-    # with tf.name_scope('Add_gaussian_noise'): # revisit
-    # noise_img = v2.GaussianNoise() # todo: revisit
-    noise = tf.random_normal(shape=torch.Tensor.size(image), mean=0.0, stddev=(50)/(255), dtype=tf.float32) # todo: revisit
+    # with tf.name_scope('Add_gaussian_noise'): # todo: revisit
+    noise =  torch.empty(size=torch.Tensor.size(image), dtype=torch.float32).normal_(mean=0.0,std=(50)/(255))
+
+
     noise_img = image + noise
     noise_img = torch.clamp(noise_img, 0.0, 1.0)
     return noise_img
@@ -365,7 +369,8 @@ def random_batch_renormalization(batch_images):
     return proc_images
 
 def tf_wrapper_rb_stain(batch_images):
-    out_trans = tf.py_function(random_batch_renormalization, [batch_images], tf.float32) # todo: revisit
+    out = random_batch_renormalization([batch_images.numpy()]) # might need to detach to minimise errors
+    out_trans = torch.from_numpy(out)
     return out_trans
 
 def data_augmentation_stain_variability(images, img_size, num_channels):
@@ -373,7 +378,7 @@ def data_augmentation_stain_variability(images, img_size, num_channels):
     # images_trans = tf.map_fn(random_crop_and_resize, images_trans)
     # images_trans = tf.map_fn(random_rotate, images_trans)
     # images_trans = random_flip(images_trans)
-    images_trans = tf_wrapper_rb_stain(images_trans) # todo: revisit
+    images_trans = tf_wrapper_rb_stain(images_trans)
 
     # Make sure the image batch is in the right format.
     images_trans = torch.reshape(images_trans, [-1, img_size, img_size, num_channels])
@@ -382,10 +387,10 @@ def data_augmentation_stain_variability(images, img_size, num_channels):
 
 def data_augmentation_color(images, img_size, num_channels):
     images_trans = images
-    images_trans = tf.map_fn(random_crop_and_resize, images_trans) # todo: revisit
-    images_trans = tf.map_fn(random_rotate, images_trans) # todo: revisit
+    images_trans = tf.map_fn(random_crop_and_resize, images_trans)
+    images_trans = tf.map_fn(random_rotate, images_trans)
     images_trans = random_flip(images_trans)
-    images_trans = tf.map_fn(random_color_jitter, images_trans) # todo: revisit
+    images_trans = tf.map_fn(random_color_jitter, images_trans)
 
     # Make sure the image batch is in the right format.
     images_trans = torch.reshape(images_trans, [-1, img_size, img_size, num_channels])

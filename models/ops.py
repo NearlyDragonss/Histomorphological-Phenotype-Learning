@@ -2,10 +2,11 @@ from models.activations import *
 import tensorflow as tf
 import numpy as np
 import torch
+import torch.nn.functional
 
 # StyleGAN: Apply a weighted input noise to a layer.
 def noise_input(inputs, scope):
-    with tf.variable_scope('noise_input_%s' % scope): # todo: revisit
+    with tf.variable_scope('noise_input_%s' % scope):
 
         # Scale per channel as mentioned in the paper.
         if len(inputs.shape) == 2:
@@ -13,7 +14,8 @@ def noise_input(inputs, scope):
         else:
             noise_shape = [torch.Tensor.size(inputs)[0], 1, 1, inputs.shape[3]]
         noise = torch.normal(mean=0.0, std=1.0, size=noise_shape)
-        weights = tf.get_variable('noise_weights', shape=inputs.shape[-1], initializer=tf.contrib.layers.xavier_initializer()) # todo: revisit
+        # todo: pass in relevant variable or create one
+        weights = tf.get_variable('noise_weights', shape=inputs.shape[-1], initializer=tf.contrib.layers.xavier_initializer())
 
         outputs = inputs + torch.mul(weights, noise)
 
@@ -51,12 +53,12 @@ def style_extract(inputs, latent_dim, spectral, init, regularizer, scope, power_
     
 
 def style_extract_2(inputs, latent_dim, spectral, init, regularizer, scope, power_iterations=1):
-    with tf.variable_scope('style_extract_%s' % scope) : # todo: revisit
-        means = tf.reduce_mean(inputs, axis=[1,2], keep_dims=True) # todo: revisit
-        stds  = tf.sqrt(tf.reduce_mean((inputs-means)**2, axis=[1,2], keep_dims=True))
-        means = tf.reduce_mean(means, axis=[1,2])
-        stds  = tf.reduce_mean(stds, axis=[1,2])
-        comb  = tf.concat([means, stds], axis=1)
+    with tf.variable_scope('style_extract_%s' % scope) : # todo: check what variable are bein passed in
+        means = torch.mean(inputs, dim=[1,2], keepdim=True)
+        stds = torch.sqrt(torch.mean((inputs-means)**2, dim=(1,2), keepdim=True))
+        means = torch.mean(means, dim=(1,2))
+        stds = torch.mean(stds, dim=(1,2))
+        comb = torch.cat([means. stds], dim=1)
         
         net    = dense(inputs=comb, out_dim=latent_dim, use_bias=True, spectral=spectral, power_iterations=power_iterations, init=init, regularizer=regularizer, display=False, scope=1)
         net    = ReLU(net)
@@ -105,10 +107,10 @@ def attention_block(x, scope, spectral=True, init='xavier', regularizer=None, po
 def attention_block_2(x, scope, spectral=True, init='xavier', regularizer=None, power_iterations=1, display=True):
 
     batch_size, height, width, channels = x.get_shape().as_list()
-    with tf.variable_scope('attention_block_2_%s' % scope): # todo: revisit
+    with tf.variable_scope('attention_block_2_%s' % scope): # todo: find used variables
 
         # Global value for all pixels, measures how important is the context for each of them.
-        gamma = tf.get_variable('gamma', shape=(1), initializer=tf.constant_initializer(0.0)) # todo: revisit
+        gamma = tf.get_variable('gamma', shape=(1), initializer=tf.constant_initializer(0.0)) # todo: import or make this variable
         f_g_channels = channels//8
         h_channels = channels//2
 
@@ -116,23 +118,23 @@ def attention_block_2(x, scope, spectral=True, init='xavier', regularizer=None, 
         downsampled_n = location_n//4
 
         f = convolutional(inputs=x, output_channels=f_g_channels, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', spectral=True, init=init, regularizer=regularizer, power_iterations=power_iterations, scope=1, display=False)
-        f = tf.layers.max_pooling2d(inputs=f, pool_size=[2, 2], strides=2)
+        f = torch.nn.functional.max_pool2d(input=f, kernel_size=(2, 2), stride=2)
 
         g = convolutional(inputs=x, output_channels=f_g_channels, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', spectral=True, init=init, regularizer=regularizer, power_iterations=power_iterations, scope=2, display=False)
         
         h = convolutional(inputs=x, output_channels=h_channels, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', spectral=True, init=init, regularizer=regularizer, power_iterations=power_iterations, scope=3, display=False)
-        h = tf.layers.max_pooling2d(inputs=h, pool_size=[2, 2], strides=2)
+        h = torch.nn.functional.max_pool2d(inputs=h, pool_size=[2,2], strides=2)
 
         # Flatten f, g, and h per channel.
-        f_flat = tf.reshape(f, shape=tf.stack([tf.shape(x)[0], downsampled_n, f_g_channels]))
-        g_flat = tf.reshape(g, shape=tf.stack([tf.shape(x)[0], location_n, f_g_channels]))
-        h_flat = tf.reshape(h, shape=tf.stack([tf.shape(x)[0], downsampled_n, h_channels]))
+        f_flat = torch.reshape(f, shape=torch.stack([torch.Tensor.size(x)[0], downsampled_n, f_g_channels]))
+        g_flat = torch.reshape(g, shape=torch.stack([torch.Tensor.size(x)[0], location_n, f_g_channels]))
+        h_flat = torch.reshape(h, shape=torch.stack([torch.Tensor.size(x)[0], downsampled_n, h_channels]))
 
-        attn = tf.matmul(g_flat, f_flat, transpose_b=True)
-        attn = tf.nn.softmax(attn)
+        attn = torch.matmul(g_flat, f_flat, transpose_b=True)
+        attn = torch.nn.functional.softmax(attn)
 
-        o = tf.matmul(attn, h_flat)
-        o = tf.reshape(o, shape=tf.stack([tf.shape(x)[0], height, width, channels//2]))
+        o = torch.matmul(attn, h_flat)
+        o = torch.reshape(o, shape=torch.stack([torch.Tensor.size(x)[0], height, width, channels//2]))
         o = convolutional(inputs=o, output_channels=channels, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', spectral=True, init=init, regularizer=regularizer, power_iterations=power_iterations, scope=4, display=False)
         y = gamma*o + x
 
@@ -149,11 +151,11 @@ def spectral_normalization(filter, power_iterations):
     # Isotropic gaussian. 
 
     filter_shape = filter.get_shape()
-    filter_reshape = tf.reshape(filter, [-1, filter_shape[-1]])
+    filter_reshape = torch.reshape(filter, [-1, filter_shape[-1]])
     
     u_shape = (1, filter_shape[-1])
     # If I put trainable = False, I don't need to use tf.stop_gradient()
-    u = tf.get_variable('u', shape=u_shape, dtype=tf.float32, initializer=tf.truncated_normal_initializer(), trainable=False)
+    u = tf.get_variable('u', shape=u_shape, dtype=tf.float32, initializer=tf.truncated_normal_initializer(), trainable=False) # todo: import or create this variable
 
     # u_norm, singular_w = power_iteration_method(filter_reshape, u, power_iterations)
 
@@ -161,12 +163,12 @@ def spectral_normalization(filter, power_iterations):
     v_norm = None
 
     for i in range(power_iterations):
-        v_iter = tf.matmul(u_norm, tf.transpose(filter_reshape))
-        v_norm = tf.math.l2_normalize(x=v_iter, epsilon=1e-12)
-        u_iter = tf.matmul(v_norm, filter_reshape)
-        u_norm = tf.math.l2_normalize(x=u_iter, epsilon=1e-12)
+        v_iter = torch.matmul(u_norm, torch.t(filter_reshape)) # todo: check the shape of the tensor for transposition
+        v_norm = torch.nn.functional.normalize(v_iter, p=2, eps=1e-12)
+        u_iter = torch.matmul(v_norm, filter_reshape)
+        u_norm = torch.nn.functional.normalize(u_iter, p=2, eps=1e-12)
 
-    singular_w = tf.matmul(tf.matmul(v_norm, filter_reshape), tf.transpose(u_norm))[0,0]
+    singular_w = torch.matmul(torch.matmul(v_norm, filter_reshape), torch.t(u_norm))[0,0]
 
     '''
     tf.assign(ref,  value):
@@ -181,9 +183,11 @@ def spectral_normalization(filter, power_iterations):
     If I put this here, the filter won't be use in here until the normalization is done and the value of u_norm kept in u.
     The kernel of the conv it's a variable it self, with its dependencies.
     '''
-    with tf.control_dependencies([u.assign(u_norm)]):
-        filter_normalized = filter / singular_w
-        filter_normalized = tf.reshape(filter_normalized, filter.shape)
+
+    # use torch.nograd() maybe?
+    # with tf.control_dependencies([u.assign(u_norm)]): # todo: revisit # https://www.projectpro.io/recipes/what-does-tf-control-dependencies-do
+    filter_normalized = filter / singular_w
+    filter_normalized = torch.reshape(filter_normalized, filter.shape)
 
     # We can control the normalization before the executing the optimizer by runing the update of all the assign operations 
     # in the variable collection.
@@ -203,8 +207,99 @@ def spectral_normalization(filter, power_iterations):
 
 def convolutional(inputs, output_channels, filter_size, stride, padding, conv_type, scope, init='xavier', init_std=None, regularizer=None, data_format='NHWC', output_shape=None, spectral=False,
                   power_iterations=1, use_bias=True, display=True):
+    # Pytorch only supports NCHW format so changing format of input, should make this happen earlier likely
+    input = inputs.permute(0,3,1,2)
+
+
+
+
+    # Weight and Bias Initialization.
+    bias = torch.full(size=output_channels, fill_value=0.0)
+    filter =
+
+    # Weight Initializer
+    initial_tensor = None # todo: figure out input tensors
+
+
+
+
+
+
+    # Yet to translate
+
+    # Shape of the weights
+    current_shape = inputs.get_shape()
+    input_channels = current_shape[3]
+    if 'transpose'in conv_type or 'upscale' in conv_type: weight_shape = (output_channels, input_channels, filter_size, filter_size)
+    else: weight_shape = (input_channels, output_channels, filter_size, filter_size)
+
+    weight = None
+
+    if init=='normal':
+        if init_std is None:
+            weight_init = torch.nn.init.normal_(initial_tensor, mean=0, std=torch.tensor(0.02))
+        else:
+            weight_init = torch.nn.init.normal_(initial_tensor, mean=0, std=torch.tensor(0.02))
+    elif init=='orthogonal':
+        weight_init = torch.nn.init.orthogonal(initial_tensor)
+    elif init=='glorot_uniform':
+        weight_init = torch.nn.init.xavier_uniform_(initial_tensor)
+    else:
+        weight_init = torch.nn.init.xavier_normal_(initial_tensor)
+
+
+    # Type of convolutional operation.
+    if conv_type == 'upscale':
+        # Weight filter initializer.
+        filter = torch.nn.functional.pad(filter, (0,0, 0,0, 1,1, 1,1), mode='constant') # todo: check is correct # I switched the pad check it's right
+        filter = filter[1:,1:] + filter[:-1,1:] + filter[1:,:-1] + filter[:-1,:-1] # unsure what this does, might affect stuff
+        if spectral: filter = spectral_normalization(filter, power_iterations) # change format of stuff likely
+        strides = (2, 2) # changed for pytorch
+        # change padding type for pytorch
+        # todo: pass in kernal_size
+        if padding=="SAME":
+            padding_height = (stride - 1) + (kernel_size - 1) // 2
+            padding_width = (stride - 1) + (kernel_size - 1) // 2
+            padding_torch = (padding_height, padding_width)
+
+
+        output = tf.nn.conv2d_transpose(value=inputs, filter=filter, output_shape=tf.stack(output_shape), strides=strides, padding=padding, data_format=data_format) # todo: revisit
+        # Just need to make weight right
+        # weight = filter, output_shape is determined by stride, padding, output_padding and kernal size, data_format is always NCHW
+        output = torch.nn.functional.conv_transpose2d(input=input, weight=weight, stride=strides ,padding=padding_torch) # https://medium.com/@deepika_writes/nhwc-vs-nchw-a-memory-access-perspective-on-gpus-4e79bd3b1b54
+
+    elif conv_type == 'downscale':
+        # Weight filter initializer.
+        filter = torch.nn.functional.pad(filter, (1,1, 1,1, 0,0, 0,0), mode='constant') # todo: check is correct
+        filter = filter[1:,1:] + filter[:-1,1:] + filter[1:,:-1] + filter[:-1,:-1]
+        if spectral: filter = spectral_normalization(filter, power_iterations)
+        strides = [1, 2, 2, 1]
+        output = tf.nn.conv2d(input=inputs, filter=filter, strides=strides, padding=padding, data_format=data_format)
+        # output_function = torch.nn.Conv2d() # todo: revisit
+
+    elif conv_type == 'transpose':
+        output_shape = [torch.Tensor.size(inputs)[0], current_shape[1]*stride, current_shape[2]*stride, output_channels]
+        strides = [1, stride, stride, 1]
+        if spectral: filter = spectral_normalization(filter, power_iterations)
+        output = tf.nn.conv2d_transpose(value=inputs, filter=filter, output_shape=tf.stack(output_shape), strides=strides, padding=padding, data_format=data_format)
+
+    elif conv_type == 'convolutional':
+        strides = [1, stride, stride, 1]
+        if spectral: filter = spectral_normalization(filter, power_iterations)
+        output = tf.nn.conv2d(input=inputs, filter=filter, strides=strides, padding=padding, data_format=data_format)
+
+
+    if use_bias:
+        output = output + bias.unsqueeze(0) # todo: check how many dimentions output has as may need to add more unsqueeze
+
+    if display:
+        print('Conv Layer:     Scope=%15s Channels %5s Filter_size=%2s  Stride=%2s Padding=%6s Conv_type=%15s Output Shape: %s' %
+              (str(scope)[:14], output_channels, filter_size, stride, padding, conv_type, output.shape))
+
+
+    # Original
     with tf.variable_scope('conv_layer_%s' % scope): # todo: look into
-        # Weight Initlializer.
+        # Weight Initlializer. # method to initialise filter
         if init=='normal':
             if init_std is None:
                 weight_init = torch.nn.init.normal_(mean=0, std=torch.tensor(0.02)) # todo: figure out input tensors
@@ -221,12 +316,13 @@ def convolutional(inputs, output_channels, filter_size, stride, padding, conv_ty
         current_shape = inputs.get_shape()
         input_channels = current_shape[3]
         if 'transpose'in conv_type or 'upscale' in conv_type: filter_shape = (filter_size, filter_size, output_channels, input_channels)   
-        else: filter_shape = (filter_size, filter_size, input_channels, output_channels)    
+        else: filter_shape = (filter_size, filter_size, input_channels, output_channels)  # shape of filter
 
-        # Weight and Bias Initialization.
+        # Weight and Bias Initialization. # todo: look at whether variables need imported or created
         bias = tf.get_variable(name='bias', shape=[output_channels], initializer=tf.constant_initializer(0.0), trainable=True, dtype=tf.float32) # todo: revisit https://stackoverflow.com/questions/64390904/how-can-i-extract-the-weight-and-bias-of-linear-layers-in-pytorch
         filter = tf.get_variable(name='filter_conv', shape=filter_shape, initializer=weight_init, trainable=True, dtype=tf.float32, regularizer=regularizer)    
-        
+        # create an empty tensor with right shape and initialiser
+
        # Type of convolutional operation.
         if conv_type == 'upscale':
             output_shape = [torch.Tensor.size(inputs)[0], current_shape[1]*2, current_shape[2]*2, output_channels]
@@ -236,7 +332,8 @@ def convolutional(inputs, output_channels, filter_size, stride, padding, conv_ty
             if spectral: filter = spectral_normalization(filter, power_iterations)
             strides = [1, 2, 2, 1]
             output = tf.nn.conv2d_transpose(value=inputs, filter=filter, output_shape=tf.stack(output_shape), strides=strides, padding=padding, data_format=data_format) # todo: revisit
-            
+            # output = torch.nn.functional.conv_transpose2d(input=inputs, weight=filter, output_shape=torch.stack(output_shape), padding=padding, ) # https://medium.com/@deepika_writes/nhwc-vs-nchw-a-memory-access-perspective-on-gpus-4e79bd3b1b54
+
         elif conv_type == 'downscale':
             # Weight filter initializer.
             filter = torch.nn.functional.pad(filter, (1,1, 1,1, 0,0, 0,0), mode='constant') # todo: check is correct
@@ -244,7 +341,8 @@ def convolutional(inputs, output_channels, filter_size, stride, padding, conv_ty
             if spectral: filter = spectral_normalization(filter, power_iterations)
             strides = [1, 2, 2, 1]
             output = tf.nn.conv2d(input=inputs, filter=filter, strides=strides, padding=padding, data_format=data_format)
-            
+            # output_function = torch.nn.Conv2d() # todo: revisit
+
         elif conv_type == 'transpose':
             output_shape = [torch.Tensor.size(inputs)[0], current_shape[1]*stride, current_shape[2]*stride, output_channels]
             strides = [1, stride, stride, 1]
@@ -269,7 +367,7 @@ def dense(inputs, out_dim, scope, use_bias=True, spectral=False, power_iteration
     if init=='normal':
         weight_init = torch.nn.init.normal_(stddev=0.02)
     elif init=='orthogonal':
-        weight_init = `torch.nn.init.orthogonal`()
+        weight_init = torch.nn.init.orthogonal()
     elif init=='glorot_uniform':
         weight_init = torch.nn.init.xavier_uniform_()
     else:
@@ -277,7 +375,7 @@ def dense(inputs, out_dim, scope, use_bias=True, spectral=False, power_iteration
 
     with tf.variable_scope('dense_layer_%s' % scope):
         in_dim = inputs.get_shape()[-1]
-        weights = tf.get_variable('filter_dense', shape=[in_dim, out_dim], dtype=tf.float32, trainable=True, initializer=weight_init, regularizer=regularizer)
+        weights = tf.get_variable('filter_dense', shape=[in_dim, out_dim], dtype=tf.float32, trainable=True, initializer=weight_init, regularizer=regularizer) # todo: look at whether this needs created or imported
         
         if spectral:
             output = torch.matmul(inputs, spectral_normalization(weights, power_iterations))
@@ -285,7 +383,7 @@ def dense(inputs, out_dim, scope, use_bias=True, spectral=False, power_iteration
             output = torch.matmul(inputs, weights)
         
         if use_bias : 
-            bias = tf.get_variable('bias', [out_dim], initializer=tf.constant_initializer(0.0), trainable=True, dtype=tf.float32)
+            bias = tf.get_variable('bias', [out_dim], initializer=tf.constant_initializer(0.0), trainable=True, dtype=tf.float32) # todo: look at whether this needs created or imported
             output = torch.add(output, bias)
 
     if display:
@@ -298,7 +396,7 @@ def dense(inputs, out_dim, scope, use_bias=True, spectral=False, power_iteration
 def residual_block(inputs, filter_size, stride, padding, scope, cond_label=None, is_training=True, normalization=None, noise_input_f=False, use_bias=True, spectral=False, activation=None,
                    style_extract_f=False, latent_dim=None, init='xavier', regularizer=None, power_iterations=1, display=True):
     channels = inputs.shape.as_list()[-1]
-    with tf.variable_scope('resblock_%s' % scope):
+    with tf.variable_scope('resblock_%s' % scope): # todo: look at called tensors
         with tf.variable_scope('part_1'):
             # Convolutional
             net = convolutional(inputs, channels, filter_size, stride, padding, 'convolutional', scope=1, spectral=spectral, init=init, regularizer=regularizer, power_iterations=power_iterations, display=False)
