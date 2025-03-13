@@ -64,45 +64,44 @@ class EncoderResnetContrastive(torch.nn.Module):
 			print('Attention:  ', self.attention)
 			print()
 
-		with tf.variable_scope(self.name, reuse=self.reuse):
 
-			for layer in range(self.layers):
-				# ResBlock.
-				net = residual_block(inputs=self.net, filter_size=3, stride=1, padding='SAME', scope=layer,
-									 is_training=self.is_train, normalization=self.normalization, use_bias=True,
-									 spectral=self.spectral, init=self.init, regularizer=self.regularizer, activation=self.activation)
-				# Attention layer.
-				if self.attention is not None and net.shape.as_list()[1]==self.attention:
-					net = attention_block_2(net, spectral=True, init=self.init, regularizer=self.regularizer, scope=self.layers)
+		for layer in range(self.layers):
+			# ResBlock.
+			net = residual_block(inputs=self.net, filter_size=3, stride=1, padding='SAME', scope=layer,
+								 is_training=self.is_train, normalization=self.normalization, use_bias=True,
+								 spectral=self.spectral, init=self.init, regularizer=self.regularizer, activation=self.activation)
+			# Attention layer.
+			if self.attention is not None and net.shape.as_list()[1]==self.attention:
+				net = attention_block_2(net, spectral=True, init=self.init, regularizer=self.regularizer, scope=self.layers)
 
-				# Down.
-				net = convolutional(inputs=net, output_channels=channels[layer], filter_size=4, stride=2, padding='SAME',
-									conv_type=self.down, spectral=self.spectral, init=self.init, regularizer=self.regularizer, scope=layer)
-				if self.normalization is not None: net = self.normalization(inputs=net, training=self.is_train)
-				net = self.activation(net)
-
-			# Feature space extraction
-			max_pool = nn.MaxPool2d(pool_size=2, stride=2)
-			conv_space = max_pool(net)
-			flatten = nn.Flatten() # todo: check is correct
-			conv_space = flatten(conv_space)
-
-			# Flatten.
-			flatten = nn.Flatten()
-			net = flatten(net)
-
-			# H Representation Layer.
-			net = dense(inputs=net, out_dim=channels[-1], spectral=self.spectral, init=self.init, regularizer=self.regularizer,
-						scope='h_rep')
-			if self.normalization is not None: net = self.normalization(inputs=net, training=self.is_train)
-			h = self.activation(net)
-
-			net = dense(inputs=h, out_dim=self.h_dim, spectral=self.spectral, init=self.init, regularizer=self.regularizer, scope=2)
+			# Down.
+			net = convolutional(inputs=net, output_channels=channels[layer], filter_size=4, stride=2, padding='SAME',
+								conv_type=self.down, spectral=self.spectral, init=self.init, regularizer=self.regularizer, scope=layer)
 			if self.normalization is not None: net = self.normalization(inputs=net, training=self.is_train)
 			net = self.activation(net)
 
-			# Z Representation Layer.
-			z = dense(inputs=net, out_dim=self.z_dim, spectral=self.spectral, init=self.init, regularizer=self.regularizer, scope='z_rep')
+		# Feature space extraction
+		max_pool = nn.MaxPool2d(pool_size=2, stride=2)
+		conv_space = max_pool(net)
+		flatten = nn.Flatten() # todo: check is correct
+		conv_space = flatten(conv_space)
+
+		# Flatten.
+		flatten = nn.Flatten()
+		net = flatten(net)
+
+		# H Representation Layer.
+		net = dense(inputs=net, out_dim=channels[-1], spectral=self.spectral, init=self.init, regularizer=self.regularizer,
+					scope='h_rep')
+		if self.normalization is not None: net = self.normalization(inputs=net, training=self.is_train)
+		h = self.activation(net)
+
+		net = dense(inputs=h, out_dim=self.h_dim, spectral=self.spectral, init=self.init, regularizer=self.regularizer, scope=2)
+		if self.normalization is not None: net = self.normalization(inputs=net, training=self.is_train)
+		net = self.activation(net)
+
+		# Z Representation Layer.
+		z = dense(inputs=net, out_dim=self.z_dim, spectral=self.spectral, init=self.init, regularizer=self.regularizer, scope='z_rep')
 
 		print()
 		return conv_space, h, z

@@ -129,8 +129,6 @@ def random_color_jitter_1p0(image, p=1.0, impl='simclrv2'):
 
 # Crop.
 def distorted_bounding_box_crop(image, bbox, min_object_covered=0.1, aspect_ratio_range=(0.75, 1.33), area_range=(0.05, 1.0), max_attempts=100, scope=None):
-    # with tf.name_scope(scope, 'distorted_bounding_box_crop', [image, bbox]): # todo: revisit
-
     # get dimentions from bbox
     bbox_dimentions = bbox[0,0]
     y_min = bbox_dimentions[0]

@@ -96,4 +96,4 @@ with tf.Graph().as_default():
     contrast_pathology = RepresentationsPathology(data=data, z_dim=z_dim, layers=layers, beta_1=beta_1, init=init, regularizer_scale=regularizer_scale, spectral=spectral, attention=attention,
     							   			  	  learning_rate_e=learning_rate_e, model_name=model)
 	# Train Model.
-    losses = contrast_pathology.train(epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=check_every, report=report)
+    losses = contrast_pathology.training(epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=check_every, report=report)

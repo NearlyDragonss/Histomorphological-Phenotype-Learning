@@ -48,7 +48,6 @@ class RepresentationsPathology():
 				 regularizer_scale=1e-4,      			# Orthogonal regularization.
 				 model_name='RepresentationsPathology'   # Model Name.
 				 ):
-
 		### Input data variables.
 		self.image_height   = data.patch_h
 		self.image_width    = data.patch_w
