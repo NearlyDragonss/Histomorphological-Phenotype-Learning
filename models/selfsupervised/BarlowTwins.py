@@ -291,7 +291,6 @@ class RepresentationsPathology():
 		setup_csvs(csvs=csvs, model=self, losses=losses)
 		report_parameters(self, epochs, restore, data_out_path)
 
-		# Original
 		# Session Options.
 		# config = tf.ConfigProto(allow_soft_placement=True, log_device_placement=True)
 		config = tf.ConfigProto(allow_soft_placement=True) # todo: revisit

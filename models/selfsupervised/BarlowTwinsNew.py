@@ -1,6 +1,9 @@
 import torch
 import tensorflow as tf
 import numpy as np
+
+from models.wandb_utils import save_model_config
+
 # try:
 # 	import wandb
 # 	from models.wandb_utils import *
@@ -92,7 +95,7 @@ class RepresentationsPathology():
         self.model_name = model_name
 
         self.wandb_flag = wandb_flag
-        self.build_model()
+        self.train()
 
     # Self-supervised inputs.
     def model_inputs(self, data):
@@ -146,29 +149,31 @@ class RepresentationsPathology():
     # Encoder Network.
     def encoder(self, images, is_train, reuse, init, name, label_input=None):
         # todo: check that it all works
+        channels = [32, 64, 128, 256, 512, 1024]
         if '_0' in self.model_name:
-            conv_space, h, z = encoder_resnet_contrastive(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
+            conv_space, h, z = EncoderResnetContrastive(images=images, channels=channels, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
                                                           is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
         elif '_1' in self.model_name:
-            conv_space, h, z = encoder_resnet_contrastive_1(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
+            conv_space, h, z = EncoderResnetContrastive(images=images, channels=channels, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
                                                         is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
         elif '_2' in self.model_name:
-            conv_space, h, z = encoder_resnet_contrastive_2(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
+            conv_space, h, z = EncoderResnetContrastive(images=images, channels=channels, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
                                                         is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
         elif '_3' in self.model_name:
-            conv_space, h, z = encoder_resnet_contrastive_3(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
+            conv_space, h, z = EncoderResnetContrastive(images=images, channels=channels, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
                                                         is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
         elif '_4' in self.model_name:
-            conv_space, h, z = encoder_resnet_contrastive_4(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
+            conv_space, h, z = EncoderResnetContrastive(images=images, channels=channels, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
                                                         is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
         elif '_5' in self.model_name:
-            conv_space, h, z = encoder_resnet_contrastive_5(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
+            conv_space, h, z = EncoderResnetContrastive(images=images, channels=channels, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
                                                         is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
         elif '_6' in self.model_name:
-            conv_space, h, z = encoder_resnet_contrastive_6(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
+            channels = [64, 128, 256, 512, 1024, 2048]
+            conv_space, h, z = EncoderResnetContrastive(images=images, channels=channels, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
                                                         is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
         elif '_7' in self.model_name:
-            conv_space, h, z = encoder_resnet_contrastive_7(images=images, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
+            conv_space, h, z = EncoderResnetContrastive(images=images, channels=channels, z_dim=self.z_dim, h_dim=1024, layers=self.layers, spectral=self.spectral, activation=ReLU, reuse=reuse, init=init,
                                                         is_train=is_train, normalization=batch_norm, regularizer=None, attention=self.attention, name=name)
         return conv_space, h, z
 
@@ -179,29 +184,27 @@ class RepresentationsPathology():
         return loss
 
     # Optimizer.
-    def optimization(self):
+    def optimization(self, data_transformed_1, data_transformed_2):
+        # todo: call in train
+        # todo: add weight decay to optimizer
         # todo: translate
-        # below is like a dictionary which has custom functions within it
-        with tf.control_dependencies(tf.get_collection(tf.GraphKeys.UPDATE_OPS)): # specifies control dependancies, returnss a list of values with the name tf.GraphKeys.UPDATE_OPS
-            # Learning rate decay.
-            # todo: might need to make global
-            global_step = torch.Tensor(0, requires_grad=False) # creates a tensor that maintains shared, persisitent state that can be manipulated by the program
-            self.lr_decayed_fn = tf.train.polynomial_decay(learning_rate=self.learning_rate_input_e, global_step=global_step, decay_steps=3*self.num_samples, end_learning_rate=0.1*self.learning_rate_input_e,
-                                                           power=0.5)
-            #  Optimizer
-            opt = tf.train.AdamOptimizer(learning_rate=self.learning_rate_input_e, beta1=self.beta_1)
-            # opt = torch.optim.Adam(params=None, lr=self.learning_rate_e, betas=(self.beta_1,0.999)) #todo: set params
-            # Quick dirty optimizer for Encoder.
-            trainable_variables = tf.trainable_variables()
-            encoder_variables = [variable for variable in trainable_variables if variable.name.startswith('contrastive_encoder')]
-            train_encoder = opt.minimize(self.loss_contrastive, var_list=encoder_variables)
 
-            # Learning rate decay
-            torch.optim.lr_scheduler.PolynomialLR(optimizer=opt, )
 
+        # Optimization function
+        opt = torch.optim.Adam(params=model.parameters(), lr=self.learning_rate_e, betas=(self.beta_1, 0.999)) #todo: get model, define weight decay
+
+        # Learning rate decay.
+        self.lr_decayed_fn = torch.optim.lr_scheduler.PolynomialLR(optimizer=opt, total_iters=3*self.num_samples, power= 0.5) # todo: look at diff in parameters
+
+        #  Optimizer
+        opt.zero_grad()
+        output_1 = encoder(data_transformed_1) # Forward pass
+        output_2 = encoder(data_transformed_2)
+        self.loss_contrastive.backward(output_1, output_2) # compute gradients
+        opt.step() # update params
+        self.lr_decayed_fn.step() # update learning rate
 
         return train_encoder
-        pass
 
     # Build the Self-supervised.
     def build_model(self, data):
@@ -223,8 +226,7 @@ class RepresentationsPathology():
         ################### LOSS & OPTIMIZER ##############################################################################################################################
         # Losses.
         self.loss_contrastive = self.loss(rep_t1=self.z_rep_t1, rep_t2=self.z_rep_t2)
-        # Optimizers.
-        self.train_encoder  = self.optimization()
+        return self.real_images_1_t1, self.real_images_1_t2
 
 
     def project_subsample(self, session, data, epoch, data_out_path, report, batch_size=50): # uses data
@@ -233,29 +235,86 @@ class RepresentationsPathology():
 
     # Training function.
     def train(self, epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=None, report=False): # uses data
+
         if self.wandb_flag:
             train_config = save_model_config(self, data)
             run_name = self.model_name + '-' + data.dataset
             wandb.init(project='SSL Pathology', entity='adalbertocquiros', name=run_name, config=train_config)
 
         run_epochs = 0
-        checkpoints, csvs = setup_output(data_out_path=data_out_path, model_name=self.model_name, restore=restore)
-        losses = ['Redundancy Reduction Loss Train', 'Redundancy Reduction Loss Validation']
-        setup_csvs(csvs=csvs, model=self, losses=losses)
-        report_parameters(self, epochs, restore, data_out_path)
+        # todo: look at saving the run
+        try:
+            checkpoints, csvs = setup_output(data_out_path=data_out_path, model_name=self.model_name, restore=restore)
+            losses = ['Redundancy Reduction Loss Train', 'Redundancy Reduction Loss Validation']
+            setup_csvs(csvs=csvs, model=self, losses=losses)
+            report_parameters(self, epochs, restore, data_out_path)
 
-        # todo: ensure it lets an operation be placed on the cpu if no gpu available, allow full use of memory
-        print('Starting run.')
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            # Set GPU memory management similar to TensorFlow
+            torch.backends.cudnn.benchmark = True  # Optimizes performance for fixed input sizes
+            torch.backends.cudnn.enabled = True # Enables cuDNN acceleration (if available)
+            # Prevent PyTorch from allocating all GPU memory at once (equivalent to TF's allow_growth)
+            torch.cuda.empty_cache()  # Clears unused cached memory
 
-        ## todo: find a way to restore progress
+            print('Starting run.')
 
-        batch_images, batch_labels = data.training.next_batch(n_images)
-        data.training.reset()
-        feed_dict = {self.real_images_1:batch_images, self.real_images_2:batch_images}
-        output_layers_transformed = [self.real_images_1_t1, self.real_images_1_t2]
+            # Training session
+            if self.wandb_flag: wandb.tensorflow.log(tf.summary.merge_all()) # todo: return to
 
-        self.build_model(batch_images)
+            # todo: check below is correct
+            # Restore previous session.
+            if restore:
+                check = get_checkpoint(data_out_path)
+                saver.restore(session, check)
+                print('Restored model: %s' % check)
 
 
+
+            ## todo: find a way to restore progress
+
+            # Example of augmentation images.
+            batch_images, batch_labels = data.training.next_batch(n_images)
+            data.training.reset()
+
+            # transform the images
+            real_images_1_t1, real_images_1_t2 = self.build_model(batch_images)
+            write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_1.png'), data=real_images_1_t1, metadata=False)
+            write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_2.png'), data=real_images_1_t2, metadata=False)
+
+            if self.wandb_flag: # todo: revisit
+                dict_ = {"transformed_1": wandb.Image(os.path.join(data_out_path, 'images/transformed_1.png')), "transformed_2": wandb.Image(os.path.join(data_out_path, 'images/transformed_2.png'))}
+                wandb.log(dict_)
+
+            # Epoch Iteration.
+            for epoch in range(0, epochs+1):
+
+                # Batch Iteration.
+                for batch_images, batch_labels in data.training:
+
+                    ################################# TRAINING ENCODER #################################################
+                    # Update discriminator.
+                    real_images_1_t1, real_images_1_t2 = self.build_model(batch_images)
+
+                    opt = torch.optim.Adam(params=model.parameters(), lr=self.learning_rate_e, betas=(self.beta_1, 0.999)) #todo: get model, define weight decay
+
+                    # Learning rate decay.
+                    self.lr_decayed_fn = torch.optim.lr_scheduler.PolynomialLR(optimizer=opt, total_iters=3*self.num_samples, power= 0.5) # todo: look at diff in parameters
+
+                    #  Optimizer
+                    opt.zero_grad()
+                    output_1 = encoder(real_images_1_t1) # Forward pass # todo: get encoder
+                    output_2 = encoder(real_images_1_t2)
+                    self.loss_contrastive.backward(output_1, output_2) # compute gradients
+                    opt.step() # update params
+                    self.lr_decayed_fn.step()
+
+
+
+        except RuntimeError as e:
+            if "CUDA out of memory" in str(e):
+                print("Out of Memory! Reducing batch size may help.")
+                torch.cuda.empty_cache()  # Clears unused cached memory
+            else:
+                raise e  # Re-raise other exceptions
 
         pass
