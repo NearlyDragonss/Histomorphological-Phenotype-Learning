@@ -274,22 +274,22 @@ def data_augmentation(images, crop, rotation, flip, g_blur, g_noise, color_disto
     images_trans = images
     # Spatial transformations.
     if crop:
-        images_trans = tf.map_fn(random_crop_and_resize, images_trans) # todo: revisit
+        images_trans = tf.map_fn(random_crop_and_resize, images_trans)
     if rotation:
-        images_trans = tf.map_fn(random_rotate, images_trans) # todo: revisit
+        images_trans = tf.map_fn(random_rotate, images_trans)
     if flip:
         images_trans = random_flip(images_trans)
     # Gaussian blur and noise transformations.
     if g_blur:
-        images_trans = tf.map_fn(random_blur, images_trans) # todo: revisit
+        images_trans = tf.map_fn(random_blur, images_trans)
     if g_noise:
-        images_trans = tf.map_fn(random_gaussian_noise, images_trans) # todo: revisit
+        images_trans = tf.map_fn(random_gaussian_noise, images_trans)
     # Color distorsions.
     if color_distort:
-        images_trans = tf.map_fn(random_color_jitter, images_trans) # todo: revisit
+        images_trans = tf.map_fn(random_color_jitter, images_trans)
     # Sobel filter.
     if sobel_filter:
-        images_trans = tf.map_fn(random_sobel_filter, images_trans) # todo: revisit
+        images_trans = tf.map_fn(random_sobel_filter, images_trans)
     # Make sure the image batch is in the right format.
     images_trans = torch.reshape(images_trans, [-1, img_size, img_size, num_channels])
     images_trans = torch.clamp(images_trans, 0., 1.)

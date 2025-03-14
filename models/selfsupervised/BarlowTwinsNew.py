@@ -213,7 +213,6 @@ class RepresentationsPathology(torch.nn.Module):
 
 
     def project_subsample(self, data, epoch, data_out_path, report, batch_size=50):
-        # todo
         # Updated
         if not report:
             return
@@ -291,7 +290,7 @@ class RepresentationsPathology(torch.nn.Module):
             print('Starting run.')
 
             # Training session
-            if self.wandb_flag: wandb.tensorflow.log(tf.summary.merge_all()) # todo: return to
+            wandb.watch(self, log_freq=100)
 
             # Restore previous session.
             if restore:
