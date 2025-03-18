@@ -1,17 +1,14 @@
-from models.normalization import *
-from models.activations import *
 from models.ops import *
 import tensorflow as tf
-import numpy as np
 from torch import nn
 
 display = True
 
 class EncoderResnetContrastive(torch.nn.Module):
-	def __init__(self, en_type, images, channels, z_dim, h_dim, layers, spectral, activation, is_train, reuse, init='xavier',
+	def __init__(self, en_type, channels, z_dim, h_dim, layers, spectral, activation, is_train, reuse, init='xavier',
 			   regularizer=None, normalization=None, attention=None, down='downscale', name='contrastive_encoder'):
+		super(EncoderResnetContrastive, self).__init__()
 		self.en_type = en_type
-		self.net = images
 		self.channels = channels
 		self.z_dim = z_dim
 		self.h_dim = h_dim
@@ -34,40 +31,30 @@ class EncoderResnetContrastive(torch.nn.Module):
 			print('Attention:  ', attention)
 			print()
 
-	def forward(self):
+	def forward(self, images):
 		if '_0' in self.en_type:
-			conv_space, h, z = self.encoder_resnet_contrastive()
+			conv_space, h, z = self.encoder_resnet_contrastive(images)
 		elif '_1' in self.en_type:
-			conv_space, h, z = self.encoder_resnet_contrastive_1()
+			conv_space, h, z = self.encoder_resnet_contrastive_1(images)
 		elif '_2' in self.en_type:
-			conv_space, h, z = self.encoder_resnet_contrastive_2()
+			conv_space, h, z = self.encoder_resnet_contrastive_2(images)
 		elif '_3' in self.en_type:
-			conv_space, h, z = self.encoder_resnet_contrastive_3()
+			conv_space, h, z = self.encoder_resnet_contrastive_3(images)
 		elif '_4' in self.en_type:
-			conv_space, h, z = self.encoder_resnet_contrastive_4()
+			conv_space, h, z = self.encoder_resnet_contrastive_4(images)
 		elif '_5' in self.en_type:
-			conv_space, h, z = self.encoder_resnet_contrastive_5()
+			conv_space, h, z = self.encoder_resnet_contrastive_5(images)
 		elif '_6' in self.en_type:
-			conv_space, h, z = self.encoder_resnet_contrastive_6()
+			conv_space, h, z = self.encoder_resnet_contrastive_6(images)
 		elif '_7' in self.en_type:
-			conv_space, h, z = self.encoder_resnet_contrastive_7()
+			conv_space, h, z = self.encoder_resnet_contrastive_7(images)
 		return conv_space, h, z
 
 
-	def encoder_resnet_contrastive_6(self):
-		channels = [64, 128, 256, 512, 1024, 2048]
-		if display:
-			print('CONTRASTIVE ENCODER INFORMATION:')
-			print('Channels: ', channels[:self.layers])
-			print('Normalization: ', self.normalization)
-			print('Activation: ', self.activation)
-			print('Attention:  ', self.attention)
-			print()
-
-
+	def encoder_resnet_contrastive_6(self, images):
 		for layer in range(self.layers):
 			# ResBlock.
-			net = residual_block(inputs=self.net, filter_size=3, stride=1, padding='SAME', scope=layer,
+			net = residual_block(inputs=images, filter_size=3, stride=1, padding='SAME', scope=layer,
 								 is_training=self.is_train, normalization=self.normalization, use_bias=True,
 								 spectral=self.spectral, init=self.init, regularizer=self.regularizer, activation=self.activation)
 			# Attention layer.
@@ -75,7 +62,7 @@ class EncoderResnetContrastive(torch.nn.Module):
 				net = attention_block_2(net, spectral=True, init=self.init, regularizer=self.regularizer, scope=self.layers)
 
 			# Down.
-			net = convolutional(inputs=net, output_channels=channels[layer], filter_size=4, stride=2, padding='SAME',
+			net = convolutional(inputs=net, output_channels=self.channels[layer], filter_size=4, stride=2, padding='SAME',
 								conv_type=self.down, spectral=self.spectral, init=self.init, regularizer=self.regularizer, scope=layer)
 			if self.normalization is not None: net = self.normalization(inputs=net, training=self.is_train)
 			net = self.activation(net)
@@ -91,7 +78,7 @@ class EncoderResnetContrastive(torch.nn.Module):
 		net = flatten(net)
 
 		# H Representation Layer.
-		net = dense(inputs=net, out_dim=channels[-1], spectral=self.spectral, init=self.init, regularizer=self.regularizer,
+		net = dense(inputs=net, out_dim=self.channels[-1], spectral=self.spectral, init=self.init, regularizer=self.regularizer,
 					scope='h_rep')
 		if self.normalization is not None: net = self.normalization(inputs=net, training=self.is_train)
 		h = self.activation(net)
@@ -107,10 +94,10 @@ class EncoderResnetContrastive(torch.nn.Module):
 		return conv_space, h, z
 
 
-	def encoder_resnet_contrastive_2(self):
+	def encoder_resnet_contrastive_2(self, images):
 		# with tf.variable_scope(name, reuse=reuse):
 
-		net = convolutional(inputs=self.net, output_channels=16, filter_size=7, stride=1, padding='SAME',
+		net = convolutional(inputs=images, output_channels=16, filter_size=7, stride=1, padding='SAME',
 							conv_type='convolutional', spectral=self.spectral, init=self.init, regularizer=self.regularizer,
 							scope='intital_layer', display=True)
 
@@ -165,12 +152,12 @@ class EncoderResnetContrastive(torch.nn.Module):
 		return conv_space, h, z
 
 
-	def encoder_resnet_contrastive_1(self):
+	def encoder_resnet_contrastive_1(self, images):
 		# with tf.variable_scope(name, reuse=reuse): # todo: check variables
 
 		for layer in range(self.layers):
 			# ResBlock.
-			net = residual_block(inputs=self.net, filter_size=5, stride=1, padding='SAME', scope='%sa' % layer,
+			net = residual_block(inputs=images, filter_size=5, stride=1, padding='SAME', scope='%sa' % layer,
 								 is_training=self.is_train, normalization=self.normalization, use_bias=True,
 								 spectral=self.spectral, init=self.init, regularizer=self.regularizer, activation=self.activation)
 			# Attention layer.
@@ -216,11 +203,11 @@ class EncoderResnetContrastive(torch.nn.Module):
 		return conv_space, h, z
 
 
-	def encoder_resnet_contrastive_3(self):
+	def encoder_resnet_contrastive_3(self, images):
 
 		# with tf.variable_scope(self.name, reuse=self.reuse):
 
-		net = convolutional(inputs=self.net, output_channels=32, filter_size=7, stride=2, padding='SAME',
+		net = convolutional(inputs=images, output_channels=32, filter_size=7, stride=2, padding='SAME',
 							conv_type='convolutional', spectral=self.spectral, init=self.init,
 							regularizer=self.regularizer, scope='intital_layer', display=True)
 
@@ -235,12 +222,13 @@ class EncoderResnetContrastive(torch.nn.Module):
 				net = attention_block_2(net, spectral=True, init=self.init, regularizer=self.regularizer, scope=self.layers)
 
 			# ResBlock.
-			net = residual_block(inputs=net, filter_size=5, stride=1, padding='SAME', scope='%sb' % layer, is_training=is_train, normalization=normalization, use_bias=True, spectral=spectral, init=init,
-								 regularizer=self.regularizer, activation=self.activation)
+			net = residual_block(inputs=net, filter_size=5, stride=1, padding='SAME', scope='%sb' % layer,
+								 is_training=self.is_train, normalization=self.normalization, use_bias=True,
+								 spectral=self.spectral, init=self.init, regularizer=self.regularizer, activation=self.activation)
 
 			# Down.
 			net = convolutional(inputs=net, output_channels=self.channels[layer], filter_size=4, stride=2,
-								padding='SAME', conv_type=down, spectral=self.spectral, init=self.init,
+								padding='SAME', conv_type=self.down, spectral=self.spectral, init=self.init,
 								regularizer=self.regularizer, scope=layer)
 			if self.normalization is not None: net = self.normalization(inputs=net, training=self.is_train)
 			net = self.activation(net)
@@ -274,11 +262,11 @@ class EncoderResnetContrastive(torch.nn.Module):
 		return conv_space, h, z
 
 
-	def encoder_resnet_contrastive_4(self):
+	def encoder_resnet_contrastive_4(self, images):
 
 		# with tf.variable_scope(name, reuse=reuse):
 
-		net = convolutional(inputs=self.net, output_channels=32, filter_size=7, stride=2, padding='SAME',
+		net = convolutional(inputs=images, output_channels=32, filter_size=7, stride=2, padding='SAME',
 							conv_type='convolutional', spectral=self.spectral, init=self.init,
 							regularizer=self.regularizer, scope='intital_layer', display=True)
 
@@ -329,11 +317,11 @@ class EncoderResnetContrastive(torch.nn.Module):
 		return conv_space, h, z
 
 
-	def encoder_resnet_contrastive_5(self):
+	def encoder_resnet_contrastive_5(self, images):
 
 		# with tf.variable_scope(name, reuse=reuse):
 
-		net = convolutional(inputs=self.net, output_channels=32, filter_size=7, stride=2, padding='SAME',
+		net = convolutional(inputs=images, output_channels=32, filter_size=7, stride=2, padding='SAME',
 							conv_type='convolutional', spectral=self.spectral, init=self.init,
 							regularizer=self.regularizer, scope='intital_layer', display=True)
 
@@ -390,12 +378,12 @@ class EncoderResnetContrastive(torch.nn.Module):
 		return conv_space, h, z
 
 
-	def encoder_resnet_contrastive(self):
+	def encoder_resnet_contrastive(self, images):
 		# with tf.variable_scope(name, reuse=reuse): # todo: look into
 
 		for layer in range(self.layers):
 			# ResBlock.
-			net = residual_block(inputs=self.net, filter_size=3, stride=1, padding='SAME', scope=layer,
+			net = residual_block(inputs=images, filter_size=3, stride=1, padding='SAME', scope=layer,
 								 is_training=self.is_train, normalization=self.normalization, use_bias=True,
 								 spectral=self.spectral, init=self.init, regularizer=self.regularizer,
 								 activation=self.activation)
@@ -441,13 +429,13 @@ class EncoderResnetContrastive(torch.nn.Module):
 
 
 
-	def encoder_resnet_contrastive_7(self):
+	def encoder_resnet_contrastive_7(self, images):
 		representation = list()
 		# with tf.variable_scope(name, reuse=reuse):
 
 		for layer in range(self.layers):
 			# ResBlock.
-			net, style_resnet = residual_block(inputs=self.net, filter_size=3, stride=1, padding='SAME', scope=layer,
+			net, style_resnet = residual_block(inputs=images, filter_size=3, stride=1, padding='SAME', scope=layer,
 											   is_training=self.is_train, normalization=self.normalization,
 											   use_bias=True, spectral=self.spectral, init=self.init,
 											   regularizer=self.regularizer, activation=self.activation,
@@ -455,7 +443,7 @@ class EncoderResnetContrastive(torch.nn.Module):
 			representation.append(style_resnet)
 
 			# Attention layer.
-			if attention is not None and net.shape.as_list()[1]==self.attention:
+			if self.attention is not None and net.shape.as_list()[1]==self.attention:
 				net = attention_block_2(net, spectral=True, init=self.init, regularizer=self.regularizer, scope=self.layers)
 
 			# Down.

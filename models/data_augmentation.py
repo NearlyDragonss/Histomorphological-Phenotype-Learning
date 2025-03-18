@@ -21,14 +21,17 @@ def map_func(func, tensor):
 
 # Random sampling to recide if the transformation is applied.
 def random_apply(func, p, x):
-    return torch.cond(torch.less(torch.rand([], dtype=tf.float32), p.type(torch.float32)), lambda: func(x), lambda: x) # might have issues due to torch.cond
+    if torch.less(torch.rand(()), float(p)):
+        return func(x)
+    else:
+        return x
 
 
 ############### COLOR ###############
 # Two version of random change to brightness: Addition/Multiplicative.
 def random_brightness(image, max_delta, impl='simclrv2'):
     if impl == 'simclrv2':
-        factor = torch.rand([], max(1.0 - max_delta, 0), 1.0 + max_delta)
+        factor = torch.rand((), max(1.0 - max_delta, 0), 1.0 + max_delta)
         image = image * factor
     elif impl == 'simclrv1':
         image = f.adjust_brightness(image, random.randint(-max_delta, max_delta))
@@ -49,26 +52,34 @@ def color_jitter_rand(image, brightness=0, contrast=0, saturation=0, hue=0, impl
             if contrast == 0:
                 return x
             else:
-                return f.adjust_contrast(x, random.randint(1-contrast, 1+contrast))
+                return f.adjust_contrast(x, random.uniform(1-contrast, 1+contrast))
         def saturation_foo():
             if saturation == 0:
                 return x
             else:
-                return f.adjust_saturation(x, random.randint(1-contrast, 1+contrast))
+                return f.adjust_saturation(x, random.uniform(1-contrast, 1+contrast))
         def hue_foo():
             if hue == 0:
                 return x
             else:
                 return f.adjust_hue(x, random.uniform(-hue, hue))
-        x = torch.cond(torch.less(i, 2),
-                       lambda: torch.cond(torch.less(i, 1), brightness_foo, contrast_foo),
-                       lambda: torch.cond(torch.less(i, 3), saturation_foo, hue_foo))
+        if torch.less(i, 2):
+            if torch.less(i, 1):
+                x = brightness_foo(x)
+            else:
+                x = contrast_foo(x)
+        else:
+            if torch.less(i, 3):
+                x = saturation_foo(x)
+            else:
+                x = hue_foo(x)
         return x
 
-    perm = torch.randperm(torch.arange(4).size, [0]) # todo: check this # https://stackoverflow.com/questions/44738273/torch-how-to-shuffle-a-tensor-by-its-rows
+    perm = torch.randperm(4) # todo: check this # https://stackoverflow.com/questions/44738273/torch-how-to-shuffle-a-tensor-by-its-rows
+    print(type(image))
     for i in range(4):
         image = apply_transform(perm[i], image)
-        image = torch.clamp(image, 0., 1.)
+        image = torch.clamp(image, 0.0, 1.0)
     return image
 
 # No random color transformations: 1st Bright, 2nd Contrast, 3rd Saturation, and 4th Hue.
@@ -135,25 +146,26 @@ def distorted_bounding_box_crop(image, bbox, min_object_covered=0.1, aspect_rati
     x_min = bbox_dimentions[1]
     y_max = bbox_dimentions[2]
     x_max = bbox_dimentions[3]
-    object_region = image[:, y_min:y_max, x_min:x_max]
-    bbox_height = y_max-y_min
-    bbox_width = x_max - x_min
+    # object_region = image[:, y_min:y_max, x_min:x_max]
+    bbox_height = int(y_max-y_min)
+    bbox_width = int(x_max - x_min)
 
     # Resizes and crops based on bbox parameters
-    image = torchvision.transforms.RandomResizedCrop(size=(bbox_height, bbox_width), ratio=aspect_ratio_range.toTuple(), scale=(min_object_covered, 1.0))
+    transformation = torchvision.transforms.RandomResizedCrop(size=(bbox_height, bbox_width), ratio=aspect_ratio_range, scale=(min_object_covered, 1.0))
+    image = transformation(image)
     return image
 
 # Crop and resize image.
 def crop_and_resize(image, height, width, area_range):
-    bbox = torch.tensor([0.0, 0.0, 1.0, 1.0], dtype=torch.float32, shape=[1, 1, 4])
+    bbox = torch.tensor([[[0.0, 0.0, 1.0, 1.0]]], dtype=torch.float32)
     aspect_ratio = width / height
     image = distorted_bounding_box_crop(image, bbox, min_object_covered=0.1, aspect_ratio_range=(3./4*aspect_ratio, 4./3.*aspect_ratio), area_range=area_range, max_attempts=100, scope=None)
-    return torchvision.transforms.resize(image, (height,width), InterpolationMode.BICUBIC)  # todo: could be wrong
+    return torch.nn.functional.interpolate(image.unsqueeze(0), size=(height, width), mode="bicubic", align_corners=False)[0]
 
 
 # Random crop and resize.
 def random_crop_and_resize(image, prob=1.0):
-    height, width, channels = image.shape.as_list()
+    height, width, channels = list(image.shape)
     def transformation(image):
         images = crop_and_resize(image=image, height=height, width=width, area_range=(0.08, 1.0))
         return images
@@ -162,7 +174,7 @@ def random_crop_and_resize(image, prob=1.0):
 
 
 def random_crop_and_resize_p075(image, prob=1.0):
-    height, width, channels = image.shape.as_list()
+    height, width, channels = list(image.shape)
     def transformation(image):
         images = crop_and_resize(image=image, height=height, width=width, area_range=(0.75, 1.0))
         return images
@@ -206,10 +218,10 @@ def random_flip(image):
 ############### BLUR ###############
 
 def gaussian_blur(image, kernel_size, sigma, padding='same'):
-    radius = (kernel_size/2).type(torch.int32)
+    radius = int(kernel_size/2)
     kernel_size = radius * 2 + 1 # number
-    x = (torch.arange(-radius, radius + 1)).type(torch.float) # shape = [1,2,3,4,4,54,45,3]
-    blur_filter = torch.exp(-torch.pow(x, 2.0) / (2.0 * torch.pow(sigma.type(torch.float), 2.0))) # an exponant number
+    x = float(torch.arange(-radius, radius + 1)) # shape = [1,2,3,4,4,54,45,3]
+    blur_filter = torch.exp(-torch.pow(x, 2.0) / (2.0 * torch.pow(float(sigma), 2.0))) # an exponant number
     blur_filter /= torch.sum(blur_filter) # a number
 
     # One vertical and one horizontal filter.
@@ -233,7 +245,7 @@ def random_blur(image, p=0.5):
     height, width, channels = image.shape.as_list()
     del width
     def _transform(image):
-        sigma = (2.0-0.1)*torch.rand([], dtype=torch.float32) + 0.1
+        sigma = (2.0-0.1)*torch.rand(()) + 0.1
         return gaussian_blur(image, kernel_size=height//10, sigma=sigma, padding='same')
     return random_apply(_transform, p=p, x=image)
 
@@ -259,7 +271,10 @@ def random_gaussian_noise(image, p=0.5):
 ############### SOBEL FILTER ###############
 
 def random_apply_sobel(func, p, x):
-    return torch.cond(torch.less(torch.rand([], dtype=torch.float32), p.type(torch.float32)), lambda: torch.mean(func(x), dim=-1), lambda: x)
+    if torch.less(torch.rand((), dtype=torch.float32), float(p)):
+        return torch.mean(func(x), dim=-1)
+    else:
+        return x
 
 def random_sobel_filter(image, p=0.5):
     height, width, channels = image.shape.as_list()

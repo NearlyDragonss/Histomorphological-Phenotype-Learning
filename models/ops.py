@@ -160,8 +160,8 @@ def spectral_normalization(filter, power_iterations): # todo: might need to chan
     
     u_shape = (1, filter_shape[-1])
     # If I put trainable = False, I don't need to use tf.stop_gradient()
-    u = tf.get_variable('u', shape=u_shape, dtype=tf.float32, initializer=tf.truncated_normal_initializer(), trainable=False) # todo: import or create this variable
-
+    t = torch.empty(u_shape)
+    u = torch.nn.init.trunc_normal_(t)
     # u_norm, singular_w = power_iteration_method(filter_reshape, u, power_iterations)
 
     u_norm = u

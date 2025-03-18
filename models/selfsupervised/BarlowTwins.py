@@ -139,7 +139,7 @@ class RepresentationsPathology():
 
 		# Make sure the image batch is in the right format.
 		images_trans = torch.reshape(images_trans, [-1, self.image_height, self.image_width, self.image_channels])
-		images_trans = torch.clamp(images_trans, 0., 1.)
+		images_trans = torch.clamp(images_trans, 0.0, 1.0)
 
 		return images_trans
 
