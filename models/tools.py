@@ -48,7 +48,7 @@ def linear_interpolation(model, n_images, data_out_path, orig_vector, dest_vecto
 		alphaValues = np.linspace(0, 1, n_images)
 		for i, alpha in enumerate(alphaValues):
 			sequence[i, :] = orig_vector*(1-alpha) + dest_vector*alpha
-			# Latent space interpolation
+		# Latent space interpolation
 
 		feed_dict = {model.z_input: sequence}
 		linear_interpolation = session.run(model.output_gen, feed_dict=feed_dict)
@@ -59,7 +59,7 @@ def linear_interpolation(model, n_images, data_out_path, orig_vector, dest_vecto
 # Generates samples from the latent space to show in tensorboard. 
 # Restores a model and somples from it.
 def run_latent(model, n_images, data_out_path, sprite=True):
-	
+
 	tensorboard_path = os.path.join(data_out_path, 'tensorboard')
 	saver = tf.train.Saver()
 	with tf.Session() as session:

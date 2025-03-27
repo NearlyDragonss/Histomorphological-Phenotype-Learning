@@ -35,7 +35,7 @@ def plot_images(plt_num, images, dim1=None, dim2=None, wspace=None, title=None, 
 
 
 # Plot and save figure of losses.
-def save_loss(losses, data_out_path, dim):    
+def save_loss(losses, data_out_path, dim):
     mpl.rcParams["figure.figsize"] = dim, dim
     plt.rcParams.update({'font.size': 22})
     losses = np.array(losses)
@@ -67,7 +67,7 @@ def get_checkpoint(data_out_path, which=0):
 
 def update_csv(model, file, variables, epoch, iteration, losses):
     with open(file, 'a') as csv_file:
-        if 'loss' in file: 
+        if 'loss' in file:
             header = ['Epoch', 'Iteration']
             header.extend(losses)
             writer = csv.DictWriter(csv_file, fieldnames = header)
@@ -109,7 +109,7 @@ def setup_csvs(csvs, model, losses, restore=False):
             writer = csv.DictWriter(csv_file, fieldnames=header)
             writer.writeheader()
 
-        if len(csvs) > 1: 
+        if len(csvs) > 1:
 
             filters_s_csv, jacob_s_csv, hessian_s_csv = csvs[1:]
 
@@ -129,7 +129,7 @@ def setup_csvs(csvs, model, losses, restore=False):
             with open(hessian_s_csv, 'w') as csv_file:
                 writer = csv.writer(csv_file)
                 writer.writerow(header)
-            
+
 
 # Setup output folder.
 def setup_output(data_out_path, model_name, restore, additional_loss=False):
@@ -138,7 +138,7 @@ def setup_output(data_out_path, model_name, restore, additional_loss=False):
     checkpoints_path = os.path.join(data_out_path, 'checkpoints')
     checkpoints = os.path.join(checkpoints_path, '%s.ckt' % model_name)
     gen_images_path = os.path.join(data_out_path, 'images')
-    
+
     if not restore:
         if os.path.isdir(checkpoints_path):
             shutil.rmtree(checkpoints_path)
@@ -149,7 +149,7 @@ def setup_output(data_out_path, model_name, restore, additional_loss=False):
         if os.path.isdir(results_path):
             shutil.rmtree(results_path)
         os.makedirs(results_path)
-    
+
     loss_csv = os.path.join(data_out_path, 'loss.csv')
     if additional_loss:
         loss_csv_2 = os.path.join(data_out_path, 'loss_add.csv')
@@ -164,7 +164,7 @@ def show_generated(session, z_input, z_dim, output_fake, n_images, label_input=N
     batch_sample = 20
     for x in range(n_images):
         rand_sample = random.randint(0,batch_sample-1)
-        
+
         z_batch = np.random.uniform(low=-1., high=1., size=(batch_sample, z_dim))
         feed_dict = {z_input:z_batch}
         if c_input is not None:
@@ -176,7 +176,7 @@ def show_generated(session, z_input, z_dim, output_fake, n_images, label_input=N
         gen_samples.append(gen_batch[rand_sample, :, :, :])
         sample_z.append(z_batch[rand_sample, :])
     if show:
-        plot_images(plt_num=n_images, images=np.array(gen_samples), dim=dim)    
+        plot_images(plt_num=n_images, images=np.array(gen_samples), dim=dim)
     return np.array(gen_samples), np.array(sample_z)
 
 
@@ -292,9 +292,9 @@ def plot_data(data1, data2=None, filter1=[], filter2=[], dim=20, total_axis=20, 
         exclude2 = list()
         exclude2.extend(exclude_b)
         exclude2.extend(filter2)
-        if not same:   
-            ax2 = ax1.twinx()  
-            ax2.set_ylabel(data2['name']) 
+        if not same:
+            ax2 = ax1.twinx()
+            ax2.set_ylabel(data2['name'])
             plot = ax2
         else:
             plot = ax1
@@ -322,12 +322,12 @@ def display_activations(layer_activations, image, images_row, dim=None):
     img_height = layer_activations.shape[1]
     rows = math.ceil(num_channels/images_row)
     grid = np.zeros((img_height*rows, img_width*images_row))
-    
+
     print('Number of Channels:', num_channels)
     print('Number of Rows:', rows)
     for channel in range(num_channels):
         channel_image = layer_activations[image, :, :, channel]
-        channel_image -= channel_image.mean() 
+        channel_image -= channel_image.mean()
         channel_image /= channel_image.std()
         channel_image *= 64
         channel_image += 128
@@ -403,17 +403,17 @@ def save_fold_performance(data_out_path, fold_losses, folds_metrics, file_name):
             else:
                 line[val] = ''
         writer.writerow(line)
-    
+
 def save_fold_performance_survival(data_out_path, fold_losses, folds_metrics, file_name):
     file_path = os.path.join(data_out_path, file_name)
 
     print('folds_metrics', len(folds_metrics))
     fold_losses = ['Epochs', 'Iteration'] + fold_losses
-    
+
     with open(file_path, 'w') as csv_file:
         writer = csv.DictWriter(csv_file, fieldnames=['Fold'] + fold_losses)
         writer.writeheader()
-        
+
         train_cth_index = list()
         test_cth_index  = list()
         # Keep track of train, valid, and test Accuracy and AUC for mean and std calculation
@@ -434,26 +434,26 @@ def save_fold_performance_survival(data_out_path, fold_losses, folds_metrics, fi
         line = dict()
         line['Fold'] = 'Mean'
         for j, loss in enumerate(fold_losses):
-            if j == 5: 
+            if j == 5:
                 line[loss] = np.round(np.mean(train_cth_index),3)
-            elif j == 9: 
+            elif j == 9:
                 line[loss] = np.round(np.mean(test_cth_index),3)
             else:
                 line[loss] = ''
         writer.writerow(line)
-        
-        
+
+
         line = dict()
         line['Fold'] = 'Std'
         for j, loss in enumerate(fold_losses):
-            if j == 5: 
+            if j == 5:
                 line[loss] = np.round(np.std(train_cth_index),3)
-            elif j == 9: 
+            elif j == 9:
                 line[loss] = np.round(np.std(test_cth_index),3)
             else:
                 line[loss] = ''
         writer.writerow(line)
-    
+
 def save_unique_samples(data_out_path, train_class_set, valid_class_set, test_class_set, file_name):
     file_path = os.path.join(data_out_path, file_name)
     with open(file_path, 'w') as content:
@@ -468,7 +468,7 @@ def save_relevant(relevant, output_path, set_type):
     relevant_patches, relevant_labels, relevant_indeces, relevant_slides, relevant_weights = relevant
     dt = h5py.special_dtype(vlen=str)
     hdf5_path = os.path.join(output_path, 'hdf5_relevant_tiles_%s.h5' % set_type)
-    with h5py.File(hdf5_path, mode='w') as hdf5_content:   
+    with h5py.File(hdf5_path, mode='w') as hdf5_content:
         latent_storage = hdf5_content.create_dataset(name='latent', shape=relevant_patches.shape,     dtype=np.float32)
         label_storage  = hdf5_content.create_dataset(name='label',  shape=relevant_labels.shape,      dtype=np.float32)
         ind_storage    = hdf5_content.create_dataset(name='indece', shape=relevant_indeces.shape,     dtype=np.float32)
@@ -557,14 +557,14 @@ def gather_attention_results_multimag(hdf5_path_weights_comb):
     labels      = content['labels']
     fold_set    = content['fold_set'][:].astype(str)
     slides_m    = content['slides_metric'][:].astype(str)
-    
+
     train_ind   = np.argwhere(fold_set=='train')[:,0]
     valid_ind   = np.argwhere(fold_set=='valid')[:,0]
     test_ind    = np.argwhere(fold_set=='test')[:,0]
 
     train_slides = np.unique(slides_m[train_ind,0])
     test_slides  = np.unique(slides_m[test_ind,0])
-    
+
     if valid_ind.shape[0] == 0:
         valid_slides = None
     else:
@@ -588,14 +588,14 @@ def gather_attention_results_indmag(hdf5_path_weights_comb):
     labels      = content['labels']
     fold_set    = content['fold_set'][:].astype(str)
     slides_m    = content['slides_metric'][:].astype(str)
-    
+
     train_ind   = np.argwhere(fold_set=='train')[:,0]
     valid_ind   = np.argwhere(fold_set=='valid')[:,0]
     test_ind    = np.argwhere(fold_set=='test')[:,0]
 
     train_slides = np.unique(slides_m[train_ind,0])
     test_slides  = np.unique(slides_m[test_ind,0])
-    
+
     if valid_ind.shape[0] == 0:
         valid_slides = None
     else:

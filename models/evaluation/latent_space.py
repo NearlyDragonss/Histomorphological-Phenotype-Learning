@@ -11,7 +11,7 @@ import math
 def draw_ellipse(position, covariance, cm, label, ax=None, **kwargs):
     """Draw an ellipse with a given position and covariance"""
     ax = ax or plt.gca()
-    
+
     # Convert covariance to principal axes
     if covariance.shape == (2, 2):
         U, s, Vt = np.linalg.svd(covariance)
@@ -20,12 +20,12 @@ def draw_ellipse(position, covariance, cm, label, ax=None, **kwargs):
     else:
         angle = 0
         width, height = 2 * np.sqrt(covariance)
-    
+
     # Draw the Ellipse
     for nsig in range(1, 4):
         nsig = 2
         ax.add_patch(Ellipse(position, nsig * width, nsig * height, angle, **kwargs, facecolor=cm(label)))
-        
+
 def plot_gmm(gmm, X, label=True, elip=True):
     cm = plt.cm.get_cmap('viridis_r', 7)
     fig, big_axes = plt.subplots(figsize=(10,10), nrows=1, ncols=1, sharex=True, sharey=True)
@@ -40,7 +40,7 @@ def plot_gmm(gmm, X, label=True, elip=True):
         for label, data in enumerate(zip(gmm.means_, gmm.covariances_, gmm.weights_)):
             pos, covar, w = data
             draw_ellipse(pos, covar, alpha=w*w_factor, cm=cm, label=label)
-    
+
     return labels
 
 def combine_images(imgs, spacing=0.07):
@@ -49,7 +49,7 @@ def combine_images(imgs, spacing=0.07):
     num_images, height, width, channels = imgs.shape
     offset_h = int(spacing*height)
     offset_w = int(spacing*width)
-    
+
     grid = np.ones((2*height+offset_h, 2*width+offset_w, channels))
     for i in range(0,num_images):
         img_s = imgs[i, :, :, :]/255.
@@ -105,7 +105,7 @@ def find_gaussian(gmm, xy, l_ind, taken=None):
     min_label = None
     for label, mean in enumerate(gmm.means_):
         new = np.sqrt(np.sum(np.square(mean-xy)))
-        if new < distance and label not in taken and label in l_ind: 
+        if new < distance and label not in taken and label in l_ind:
             distance = new
             min_mean = mean
             min_label = label
@@ -116,25 +116,25 @@ def find_linear_interpolations(start, end, gmm, n_points):
     distance_end = np.Infinity
     min_start_mean = None
     min_end_mean = None
-    
+
     for label, mean in enumerate(gmm.means_):
         start_new = np.sqrt(np.sum(np.square(mean-start)))
         end_new = np.sqrt(np.sum(np.square(mean-end)))
-        if start_new < distance_start: 
+        if start_new < distance_start:
             distance_start = start_new
             min_start_mean = mean
             start_label = label
-        if end_new < distance_end: 
+        if end_new < distance_end:
             distance_end = end_new
             min_end_mean = mean
             end_label = label
-            
+
     return np.linspace(min_start_mean, min_end_mean, n_points)
 
 def find_closest_real(interpolation_points, gmm_embedding, dataset_img):
     inter_indeces_real = list()
     inter_imgs_real = list()
-    for point in interpolation_points:        
+    for point in interpolation_points:
         distance = np.Infinity
         for real_index in range(gmm_embedding.shape[0]):
             real_point = gmm_embedding[real_index]
@@ -146,29 +146,29 @@ def find_closest_real(interpolation_points, gmm_embedding, dataset_img):
         inter_imgs_real.append(dataset_img[closes_point])
     return inter_indeces_real, inter_imgs_real
 
-def plot_latent_space(embedding, images, img_path, field_names, file_name, labels=None, legend_title=None, radius_rate=0.8, scatter_plot=True, scatter_size=1, n_cells=4, size=20, figsize=(20,20), 
+def plot_latent_space(embedding, images, img_path, field_names, file_name, labels=None, legend_title=None, radius_rate=0.8, scatter_plot=True, scatter_size=1, n_cells=4, size=20, figsize=(20,20),
                       gmm_components=1000, x_lim=None, y_lim=None, cmap='viridis'):
     from matplotlib.patches import ConnectionPatch
     from mpl_toolkits.axes_grid1 import make_axes_locatable
     from sklearn import mixture
-    
+
     # CMAP for coloring.
     cm = plt.cm.get_cmap(cmap, 7)
-    
+
     # Figure ratios and total size.
     widths = list(np.ones((n_cells,))*2)
     heights = list(np.ones((n_cells,))*2)
     gs_kw = dict(width_ratios=widths, height_ratios=heights)
     plt.ioff()
     fig6, f6_axes = plt.subplots(figsize=figsize, ncols=n_cells, nrows=n_cells, gridspec_kw=gs_kw)
-    
+
     # Remove label ticks from image subplots.
     for ax_row in f6_axes:
         for ax in ax_row:
             plt.setp(ax.get_xticklabels(), visible=False)
             plt.setp(ax.get_yticklabels(), visible=False)
             ax.tick_params(axis='both', which='both', length=0)
-    
+
     # Combine four subplots for big plot on latent space.
     for ax_i in f6_axes[1:3, 1:3]:
         for ax in ax_i:
@@ -180,10 +180,10 @@ def plot_latent_space(embedding, images, img_path, field_names, file_name, label
     main_ax.set_ylabel('UMAP dimension 2', size=size)
     main_ax.tick_params(labelsize=size-2)
 
-    
-    if legend_title is None: 
+
+    if legend_title is None:
         legend_title = 'Classes'
-    
+
     # Scatter plot.
     if scatter_plot:
         # Plot latent space on big axes.
@@ -218,9 +218,9 @@ def plot_latent_space(embedding, images, img_path, field_names, file_name, label
         divider = make_axes_locatable(main_ax)
         cax = divider.append_axes('right', size='5%', pad=0.05)
         cbar = plt.colorbar(a, cax)
-        cbar.ax.tick_params(labelsize=size-8) 
+        cbar.ax.tick_params(labelsize=size-8)
 
-    # Regions of interest for images.
+        # Regions of interest for images.
     x_c = (x_lim[0] + x_lim[1])/2.
     y_c = (y_lim[0] + y_lim[1])/2.
     x_r = x_lim[1] - x_c
@@ -229,14 +229,14 @@ def plot_latent_space(embedding, images, img_path, field_names, file_name, label
     if y_r < r:
         r = y_r
     rois = get_rois(c=(x_c,y_c), r=r*radius_rate, points=12)
-    
+
     # Fit GMM to select images
     gmm = mixture.GaussianMixture(n_components=gmm_components, covariance_type='full')
     gmm.fit(embedding)
-    
+
     # Pull closest representations to points in rois.
     rois_img = git_gmm_roi_images(gmm, embedding, images, rois)
-    
+
     # Plot images of regions of interest.
     for roi_i, m_img in enumerate(rois_img):
         img, mean = m_img
@@ -252,11 +252,11 @@ def plot_latent_space(embedding, images, img_path, field_names, file_name, label
         elif roi_i in [1, 8]: col_index = 1
         elif roi_i in [2, 7]: col_index = 2
         else: col_index = 3
-        
+
         if len(img.shape) == 5:
             img = img[:, 0, :, :, :]
         if np.max(img)< 2: img = img*255.
-        
+
         # Plot combined images.
         combined_img = combine_images(img)
         if combined_img.shape[-1] == 1:
@@ -265,7 +265,7 @@ def plot_latent_space(embedding, images, img_path, field_names, file_name, label
         else:
             height, width, channels = combined_img.shape
         f6_axes[row_index, col_index].imshow(combined_img)
-        
+
 
         if roi_i == 0: box_coor = [height, width]
         elif roi_i ==1 or roi_i ==2: box_coor = [int(height/2), width]
@@ -275,7 +275,7 @@ def plot_latent_space(embedding, images, img_path, field_names, file_name, label
         elif roi_i ==7 or roi_i ==8: box_coor = [int(height/2), 0]
         elif roi_i ==9: box_coor = [height, 0]
         elif roi_i ==10 or roi_i ==11: box_coor = [width, int(height/2)]
-        
+
         axesA = f6_axes[row_index, col_index]
 
         color="black"
@@ -283,12 +283,12 @@ def plot_latent_space(embedding, images, img_path, field_names, file_name, label
         con = ConnectionPatch(xyA=mean, xyB=box_coor, coordsA="data", coordsB="data", axesA=main_ax, axesB=axesA, color=color, arrowstyle="-", zorder=0)
         con = ConnectionPatch(xyA=mean, xyB=box_coor, coordsA="data", coordsB="data", axesA=main_ax, axesB=axesA, color=color, arrowstyle="-", zorder=0)
         main_ax.add_artist(con)
-        
+
     plt.tight_layout()
     image_path = '%s/%s.jpg' % (img_path, file_name)
     plt.savefig(image_path)
     plt.close(fig6)
-    
+
     if scatter_plot:
         return image_path, rois, x_lim, y_lim
     return image_path, rois
@@ -300,15 +300,15 @@ def report_progress_latent(epoch, w_samples, img_samples, img_path, label_sample
 
     reducer = umap.UMAP(n_neighbors=30, min_dist=0.0, n_components=2, random_state=42, low_memory=True, metric=metric)
     embedding_umap = reducer.fit_transform(w_samples)
-    
+
     for radius in [0.11, 0.25, 0.51, 0.61, 0.75, 1.01, 1.25, 1.51]:
         if label_samples is not None:
             labels = label_samples[:, 0]
         else:
             labels = None
         n_components = 1000
-        image_path, rois, x_lim, y_lim = plot_latent_space(embedding=embedding_umap, images=img_samples, img_path=img_path, field_names=None, file_name='%s_epoch_%s_images_latent_space_%s'% (storage_name, epoch, str(radius).replace('.', 'p')), 
-                                                   labels=labels, gmm_components=n_components, legend_title=None, radius_rate=radius, scatter_plot=True, size=20, figsize=(20,20), x_lim=None, y_lim=None, cmap='Spectral')
+        image_path, rois, x_lim, y_lim = plot_latent_space(embedding=embedding_umap, images=img_samples, img_path=img_path, field_names=None, file_name='%s_epoch_%s_images_latent_space_%s'% (storage_name, epoch, str(radius).replace('.', 'p')),
+                                                           labels=labels, gmm_components=n_components, legend_title=None, radius_rate=radius, scatter_plot=True, size=20, figsize=(20,20), x_lim=None, y_lim=None, cmap='Spectral')
 
     label_image_path = None
     if label_samples is not None:
@@ -324,11 +324,11 @@ def report_progress_latent(epoch, w_samples, img_samples, img_path, label_sample
                 n_components = 20
                 if class_indxs.shape[0] < 20:
                     n_components = class_indxs.shape[0]
-                label_image_path, rois = plot_latent_space(embedding=class_emb, images=class_img, img_path=img_path, field_names=None, 
-                                  file_name='class_%s_%s_epoch_%s_images_latent_space_%s'% (i, storage_name, epoch, str(radius).replace('.', 'p')), gmm_components=n_components,
-                                  labels=class_labels, legend_title=None, radius_rate=radius, scatter_plot=True, size=20, figsize=(20,20), x_lim=x_lim, y_lim=y_lim, cmap='Spectral')
+                label_image_path, rois = plot_latent_space(embedding=class_emb, images=class_img, img_path=img_path, field_names=None,
+                                                           file_name='class_%s_%s_epoch_%s_images_latent_space_%s'% (i, storage_name, epoch, str(radius).replace('.', 'p')), gmm_components=n_components,
+                                                           labels=class_labels, legend_title=None, radius_rate=radius, scatter_plot=True, size=20, figsize=(20,20), x_lim=x_lim, y_lim=y_lim, cmap='Spectral')
             except:
                 print('Issue with cluster %s in epoch %s' % (i, epoch))
-        
+
     return image_path, label_image_path
 

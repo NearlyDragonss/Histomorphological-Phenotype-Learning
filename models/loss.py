@@ -57,7 +57,7 @@ def realness_loss(features_fake, features_real, anchor_0, anchor_1, v_max=1., v_
 
 def losses(loss_type, output_fake, output_real, logits_fake, logits_real, label=None, real_images=None, fake_images=None, encoder=None, discriminator=None, init=None, gp_coeff=None, hard=None,
            top_k_samples=None, display=True, enc_name='discriminator', dis_name='discriminator'):
-    
+
     # Variable to track which loss function is actually used.
     loss_print = ''
     if 'relativistic' in loss_type:
@@ -105,7 +105,7 @@ def losses(loss_type, output_fake, output_real, logits_fake, logits_real, label=
             x_gp = real_images*(1-epsilon) + fake_images*epsilon
 
             if encoder is None:
-                if label is not None: 
+                if label is not None:
                     if hard is not None:
                         out = discriminator(x_gp, hard=hard, label_input=label, reuse=True, init=init, name=dis_name)
                     else:
@@ -118,7 +118,7 @@ def losses(loss_type, output_fake, output_real, logits_fake, logits_real, label=
             else:
                 out_1 = encoder(x_gp, True, is_train=True, init=init, name=enc_name)
                 out = discriminator(out_1, reuse=True, init=init, name=dis_name)
-            
+
             logits_gp = out[1]
 
             # Calculating Gradient Penalty.
@@ -140,7 +140,7 @@ def losses(loss_type, output_fake, output_real, logits_fake, logits_real, label=
                 # For real images,
                 # Real - Avg(fake) 
                 ind_logits_diff_real_fake = tf.math.top_k(input=tf.reshape(-tf.abs(logits_diff_real_fake), (1, -1)), k=top_k_samples, sorted=False, name='top_performance_samples_real_fake').indices
-                
+
                 n = 2*top_k_samples
                 mask_fake_real  = tf.reshape(tf.reduce_sum(tf.one_hot(ind_logits_diff_fake_real, n), axis=1), (-1,1))
                 mask_real_fake  = tf.reshape(tf.reduce_sum(tf.one_hot(ind_logits_diff_real_fake, n), axis=1), (-1,1))
@@ -154,28 +154,28 @@ def losses(loss_type, output_fake, output_real, logits_fake, logits_real, label=
                 loss_gen_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits_diff_fake_real, labels=tf.ones_like(logits_fake)))
                 loss_gen_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits_diff_real_fake, labels=tf.zeros_like(logits_fake)))
             loss_gen = loss_gen_real + loss_gen_fake
-            loss_print += 'gradient penalty '   
+            loss_print += 'gradient penalty '
 
     elif 'standard' in loss_type:
 
         loss_dis_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits_fake, labels=tf.zeros_like(output_fake)))
         loss_dis_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits_real, labels=tf.ones_like(output_fake)*0.9))
-        
+
         if 'gradient penalty' in loss_type:
             # Calculating X hat.
             epsilon = tf.random.uniform(shape=tf.stack([tf.shape(real_images)[0], 1, 1, 1]), minval=0.0, maxval=1.0, dtype=tf.float32, name='epsilon')
             x_gp = real_images*(1-epsilon) + fake_images*epsilon
 
-                
+
             if encoder is None:
-                if label is not None: 
+                if label is not None:
                     out = discriminator(x_gp, label_input=label, reuse=True, init=init, name=dis_name)
                 else:
                     out = discriminator(x_gp, reuse=True, init=init, name=dis_name)
             else:
                 out_1 = encoder(x_gp, True, is_train=True, init=init, name=enc_name)
                 out = discriminator(out_1, reuse=True, init=init, name=dis_name)
-            
+
             logits_gp = out[1]
 
             # Calculating Gradient Penalty.
@@ -185,18 +185,18 @@ def losses(loss_type, output_fake, output_real, logits_fake, logits_real, label=
 
             # Discriminator loss. Uses hinge loss on discriminator.
             loss_dis = loss_dis_fake + loss_dis_real + (gp_coeff*grad_penalty)
-        
+
         else:
             # Discriminator loss. Uses hinge loss on discriminator.
-            loss_dis = loss_dis_fake + loss_dis_real 
+            loss_dis = loss_dis_fake + loss_dis_real
 
-        # Generator loss.
+            # Generator loss.
         # This is where we implement -log[D(G(z))] instead log[1-D(G(z))].
         # Recall the implementation of cross-entropy, sign already in. 
         loss_gen = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits=logits_fake, labels=tf.ones_like(output_fake)))
         loss_print += 'standard '
 
-    elif 'least square' in loss_type:       
+    elif 'least square' in loss_type:
         # Discriminator loss.
         loss_dis_fake = tf.reduce_mean(tf.square(output_fake))
         loss_dis_real = tf.reduce_mean(tf.square(output_real-1.0))
@@ -228,7 +228,7 @@ def losses(loss_type, output_fake, output_real, logits_fake, logits_real, label=
             grad_penalty= tf.reduce_sum(tf.square(l2_grad_gp-1.0))
             loss_dis += (gp_coeff*grad_penalty)
             loss_print += 'gradient penalty '
-        
+
     elif 'hinge' in loss_type:
         loss_dis_real = tf.reduce_mean(tf.maximum(tf.zeros_like(logits_real), tf.ones_like(logits_real) - logits_real))
         loss_dis_fake = tf.reduce_mean(tf.maximum(tf.zeros_like(logits_real), tf.ones_like(logits_real) + logits_fake))
@@ -242,7 +242,7 @@ def losses(loss_type, output_fake, output_real, logits_fake, logits_real, label=
         tf.reduce_mean(  tf.maximum(0.,  1.0 + logits_fake))
         '''
 
-        
+
         loss_gen = -tf.reduce_mean(logits_fake)
         loss_print += 'hinge '
 
@@ -252,9 +252,9 @@ def losses(loss_type, output_fake, output_real, logits_fake, logits_real, label=
 
     if display:
         print('[Loss] Loss %s' % loss_print)
-        
+
     return loss_dis, loss_gen
-    
+
 
 def reconstruction_loss(z_dim, w_latent_ref, w_latent):
     # MSE on Reference W latent and reconstruction, normalized by the dimensionality of the z vector.
@@ -290,20 +290,20 @@ def contrastive_loss(a, b, batch_size, temperature=1.0, weights=1.0):
     # Masks for same sample in batch.
     masks  = tf.one_hot(tf.range(batch_size), batch_size)
     labels = tf.one_hot(tf.range(batch_size), batch_size*2)
-    
+
     # Logits:
     logits_aa = tf.matmul(a, a, transpose_b=True)/temperature
     logits_aa = logits_aa - masks * 1e9
-    
+
     logits_bb = tf.matmul(b, b, transpose_b=True)/temperature
     logits_bb = logits_bb - masks * 1e9
-    
+
     logits_ab = tf.matmul(a, b, transpose_b=True)/temperature
     logits_ba = tf.matmul(b, a, transpose_b=True)/temperature
-    
+
     loss_a = tf.losses.softmax_cross_entropy(labels, tf.concat([logits_ab, logits_aa], axis=1), weights=weights)
     loss_b = tf.losses.softmax_cross_entropy(labels, tf.concat([logits_ba, logits_bb], axis=1), weights=weights)
-    
+
     loss = loss_a + loss_b
 
     return loss, logits_ab, labels
@@ -327,20 +327,30 @@ def cross_correlation_loss(z_a, z_b, lambda_):
         off_diagonals = torch.reshape(flattened, (n-1, n+1))[:, 1:]
         return torch.reshape(off_diagonals, [-1])
 
-    batch_size = torch.Tensor.size(z_a)[0].type(z_a.dtype)
+    batch_size = torch.tensor(int(z_a.shape[0]))
     repr_dim = torch.Tensor.size(z_a)[1]
 
     # Batch normalize representations
     z_a_norm = normalize_repr(z_a)
     z_b_norm = normalize_repr(z_b)
 
+
+    z_a_norm = z_a_norm.squeeze()
+    z_b_norm = z_b_norm.squeeze()
+
+    a = z_a_norm.T
+    b = z_b_norm
+
     # Cross-correlation matrix.
-    c = torch.matmul(torch.t(z_a_norm), z_b_norm,) / batch_size
+    c = torch.matmul(a, b) / batch_size
 
     inv_term    = torch.diag(c,0) # todo: check this is correct # https://stackoverflow.com/questions/70381758/equivalent-of-tf-linalg-diag-part-in-pytorch
     on_diag     = torch.sum(torch.pow(1-inv_term, 2))
 
-    redred_term = (torch.ones_like(c)-torch.eye(repr_dim))*c
+    a = torch.ones_like(c)
+    b = torch.eye(repr_dim)
+    redred_term = (a-b)
+    redred_term = redred_term*c
     off_diag    = torch.sum(torch.pow(redred_term, 2))
 
     loss = on_diag + (lambda_ * off_diag)

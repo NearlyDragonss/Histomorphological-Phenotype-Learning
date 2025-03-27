@@ -6,7 +6,8 @@ def leakyReLU(x, alpha=0.2):
     return tf.maximum(alpha*x, x)
 
 def ReLU(x):
-    return torch.nn.functional.relu(x)
+    relu = torch.nn.ReLU()
+    return relu(x)
 
 def tanh(x):
     return tf.nn.tanh(x)

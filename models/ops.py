@@ -4,8 +4,11 @@ import numpy as np
 import torch
 import torch.nn.functional
 
+from models.selfsupervised import BarlowTwins
+
+
 # StyleGAN: Apply a weighted input noise to a layer.
-def noise_input(inputs, scope):
+def noise_input(inputs, scope, model=None):
 
     # Scale per channel as mentioned in the paper.
     if len(inputs.shape) == 2:
@@ -16,7 +19,8 @@ def noise_input(inputs, scope):
     t = torch.empty(inputs.shape[-1])
     weights = torch.nn.init.xavier_uniform_(tensor=t)
     outputs = inputs + torch.mul(weights, noise)
-
+    if model != None:
+        model.set_weight(weights)
     return outputs
 
 
@@ -34,11 +38,11 @@ def embedding(shape, init='xavier', power_iterations=1, display=True, trainable=
     if display:
         print('Emb. Layer:     Output Shape: %s' % (embedding.shape))
     return embedding
-    
+
 
 def style_extract(inputs, latent_dim, spectral, init, regularizer, scope, power_iterations=1):
     with tf.variable_scope('style_extract_%s' % scope) :
-        # mean 
+        # mean
         means = tf.reduce_mean(inputs, axis=[1,2], keep_dims=True)
         # std
         stds = tf.sqrt(tf.reduce_mean((inputs-means)**2, axis=[1,2], keep_dims=True))
@@ -48,14 +52,14 @@ def style_extract(inputs, latent_dim, spectral, init, regularizer, scope, power_
         latent = dense(inputs=c, out_dim=latent_dim, use_bias=True, spectral=spectral, power_iterations=power_iterations, init=init, regularizer=regularizer, display=False, scope=1)
         net = ReLU(net)
     return latent
-    
+
 
 def style_extract_2(inputs, latent_dim, spectral, init, regularizer, scope, power_iterations=1):
     means = torch.mean(inputs, dim=[1,2], keepdim=True)
     stds = torch.sqrt(torch.mean((inputs-means)**2, dim=(1,2), keepdim=True))
     means = torch.mean(means, dim=(1,2))
     stds = torch.mean(stds, dim=(1,2))
-    comb = torch.cat([means. stds], dim=1)
+    comb = torch.cat([means, stds], dim=1)
 
     net    = dense(inputs=comb, out_dim=latent_dim, use_bias=True, spectral=spectral, power_iterations=power_iterations, init=init, regularizer=regularizer, display=False, scope=1)
     net    = ReLU(net)
@@ -74,11 +78,11 @@ def attention_block(x, scope, spectral=True, init='xavier', regularizer=None, po
         gamma = tf.get_variable('gamma', shape=(1), initializer=tf.constant_initializer(0.0))
         f_g_channels = channels//8
 
-        f = convolutional(inputs=x, output_channels=f_g_channels, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', spectral=True, init=init, regularizer=regularizer, 
+        f = convolutional(inputs=x, output_channels=f_g_channels, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', spectral=True, init=init, regularizer=regularizer,
                           power_iterations=power_iterations, scope=1, display=False)
-        g = convolutional(inputs=x, output_channels=f_g_channels, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', spectral=True, init=init, regularizer=regularizer, 
+        g = convolutional(inputs=x, output_channels=f_g_channels, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', spectral=True, init=init, regularizer=regularizer,
                           power_iterations=power_iterations, scope=2, display=False)
-        h = convolutional(inputs=x, output_channels=channels    , filter_size=1, stride=1, padding='SAME', conv_type='convolutional', spectral=True, init=init, regularizer=regularizer, 
+        h = convolutional(inputs=x, output_channels=channels    , filter_size=1, stride=1, padding='SAME', conv_type='convolutional', spectral=True, init=init, regularizer=regularizer,
                           power_iterations=power_iterations, scope=3, display=False)
 
         # Flatten f, g, and h per channel.
@@ -95,69 +99,71 @@ def attention_block(x, scope, spectral=True, init='xavier', regularizer=None, po
         y = gamma*o + x
 
     if display:
-        print('Att. Layer:     Scope=%15s Channels %5s Output Shape: %s' % 
-            (str(scope)[:14], channels, y.shape))
+        print('Att. Layer:     Scope=%15s Channels %5s Output Shape: %s' %
+              (str(scope)[:14], channels, y.shape))
 
     return y
 
 
-def attention_block_2(x, scope, spectral=True, init='xavier', regularizer=None, power_iterations=1, display=True):
+def attention_block_2(model, x, scope, spectral=True, init='xavier', regularizer=None, power_iterations=1, display=True):
 
-    batch_size, height, width, channels = x.get_shape().as_list()
+    batch_size, channels, height, width = x.shape
 
     # Global value for all pixels, measures how important is the context for each of them.
     t = torch.empty((1))
     gamma = torch.nn.init.constant_(t, 0.0)
+    model.set_gamma(gamma)
     f_g_channels = channels//8
     h_channels = channels//2
 
     location_n = height*width
     downsampled_n = location_n//4
 
-    f = convolutional(inputs=x, output_channels=f_g_channels, filter_size=1, stride=1, padding='SAME',
+    f = convolutional(model=model, inputs=x, output_channels=f_g_channels, filter_size=1, stride=1, padding='SAME',
                       conv_type='convolutional', spectral=True, init=init, regularizer=regularizer,
                       power_iterations=power_iterations, scope=1, display=False)
     f = torch.nn.functional.max_pool2d(input=f, kernel_size=(2, 2), stride=2)
 
-    g = convolutional(inputs=x, output_channels=f_g_channels, filter_size=1, stride=1, padding='SAME',
+    g = convolutional(model=model, inputs=x, output_channels=f_g_channels, filter_size=1, stride=1, padding='SAME',
                       conv_type='convolutional', spectral=True, init=init, regularizer=regularizer,
                       power_iterations=power_iterations, scope=2, display=False)
 
-    h = convolutional(inputs=x, output_channels=h_channels, filter_size=1, stride=1, padding='SAME',
+    h = convolutional(model=model, inputs=x, output_channels=h_channels, filter_size=1, stride=1, padding='SAME',
                       conv_type='convolutional', spectral=True, init=init, regularizer=regularizer,
                       power_iterations=power_iterations, scope=3, display=False)
-    h = torch.nn.functional.max_pool2d(inputs=h, pool_size=[2,2], strides=2)
+    h = torch.nn.functional.max_pool2d(input=h, kernel_size=(2,2), stride=2)
 
     # Flatten f, g, and h per channel.
-    f_flat = torch.reshape(f, shape=torch.stack([torch.Tensor.size(x)[0], downsampled_n, f_g_channels]))
-    g_flat = torch.reshape(g, shape=torch.stack([torch.Tensor.size(x)[0], location_n, f_g_channels]))
-    h_flat = torch.reshape(h, shape=torch.stack([torch.Tensor.size(x)[0], downsampled_n, h_channels]))
+    f_flat = torch.reshape(f, shape=(x.shape[0], downsampled_n, f_g_channels)) # might need to stack ints as tensors like in original
+    g_flat = torch.reshape(g, shape=(x.shape[0], location_n, f_g_channels))
+    h_flat = torch.reshape(h, shape=(x.shape[0], downsampled_n, h_channels))
 
-    attn = torch.matmul(g_flat, f_flat, transpose_b=True)
+    attn = torch.matmul(g_flat, f_flat.mT)
     attn = torch.nn.functional.softmax(attn)
 
     o = torch.matmul(attn, h_flat)
-    o = torch.reshape(o, shape=torch.stack([torch.Tensor.size(x)[0], height, width, channels//2]))
-    o = convolutional(inputs=o, output_channels=channels, filter_size=1, stride=1, padding='SAME',
+    o = torch.reshape(o, shape=(x.shape[0], channels//2, height, width))
+    o = convolutional(model=model, inputs=o, output_channels=channels, filter_size=1, stride=1, padding='SAME',
                       conv_type='convolutional', spectral=True, init=init, regularizer=regularizer,
                       power_iterations=power_iterations, scope=4, display=False)
-    y = gamma*o + x
+    la = gamma*o
+    y = la + x
 
     if display:
-        print('Atv2 Layer:     Scope=%15s Channels %5s Output Shape: %s' % 
-            (str(scope)[:14], channels, y.shape))
+        print('Atv2 Layer:     Scope=%15s Channels %5s Output Shape: %s' %
+              (str(scope)[:14], channels, y.shape))
 
     return y
 
 
 def spectral_normalization(filter, power_iterations): # todo: might need to change based on convolution
-    # Vector is preserved after each SGD iteration, good performance with power_iter=1 and presenving. 
+    # Vector is preserved after each SGD iteration, good performance with power_iter=1 and presenving.
     # Need to make v trainable, and stop gradient descent to going through this path/variables.
-    # Isotropic gaussian. 
+    # Isotropic gaussian.
 
-    filter_shape = filter.get_shape()
+    filter_shape = filter.shape
     filter_reshape = torch.reshape(filter, [-1, filter_shape[-1]])
-    
+
     u_shape = (1, filter_shape[-1])
     # If I put trainable = False, I don't need to use tf.stop_gradient()
     t = torch.empty(u_shape)
@@ -194,7 +200,7 @@ def spectral_normalization(filter, power_iterations): # todo: might need to chan
     filter_normalized = filter / singular_w
     filter_normalized = torch.reshape(filter_normalized, filter.shape)
 
-    # We can control the normalization before the executing the optimizer by runing the update of all the assign operations 
+    # We can control the normalization before the executing the optimizer by runing the update of all the assign operations
     # in the variable collection.
     # filter_normalized = filter / singular_w
     # filter_normalized = tf.reshape(filter_normalized, filter.shape)
@@ -206,36 +212,38 @@ def spectral_normalization(filter, power_iterations): # todo: might need to chan
     s, _, _ = tf.svd(filter_normalized_reshape)
     tf.summary.scalar(filter.name, s[0])
     '''
-    
+
     return filter_normalized
 
 
-def convolutional(inputs, output_channels, filter_size, stride, padding, conv_type, scope, init='xavier', init_std=None, regularizer=None, data_format='NHWC', output_shape=None, spectral=False,
+def convolutional(model, inputs, output_channels, filter_size, stride, padding, conv_type, scope, init='xavier', init_std=None, regularizer=None, data_format='NHWC', output_shape=None, spectral=False,
                   power_iterations=1, use_bias=True, display=True):
     # Pytorch only supports NCHW format so changing format of input, should make this happen earlier likely
-    input = inputs.permute(0,3,1,2)
-
     # Shape of the weights
-    current_shape = inputs.get_shape()
-    input_channels = current_shape[3]
-    if 'transpose'in conv_type or 'upscale' in conv_type: weight_shape = (output_channels, input_channels, filter_size, filter_size)
-    else: weight_shape = (input_channels, output_channels, filter_size, filter_size)
+    current_shape = inputs.shape
+    input_channels = current_shape[1]
+
+    # print(output_channels)
+    if 'transpose'in conv_type or 'upscale' in conv_type: weight_shape = (input_channels, output_channels, filter_size, filter_size) # fix this for transpose
+    else: weight_shape = (output_channels, input_channels, filter_size, filter_size)
 
 
 
     # Weight and Bias Initialization.
-    bias = torch.full(size=output_channels, fill_value=0.0)
-    weight = torch.nn.Parameter(torch.randn(*weight_shape) * 0.01) # todo: check this is right
+    bias = torch.full(size=(output_channels,), fill_value=0.0)
+    model.set_bias(bias)
+
+    weight = torch.randn(weight_shape) * 0.01 # todo: check this is right
 
     # Weight Initializer
     if init=='normal':
-        weight_init = torch.nn.init.normal_(weight, mean=0, std=0.02)
+        weight = torch.nn.init.normal_(weight, mean=0, std=0.02)
     elif init=='orthogonal':
-        weight_init = torch.nn.init.orthogonal(weight)
+        weight = torch.nn.init.orthogonal(weight)
     elif init=='glorot_uniform':
-        weight_init = torch.nn.init.xavier_uniform_(weight)
+        weight = torch.nn.init.xavier_uniform_(weight)
     else:
-        weight_init = torch.nn.init.xavier_normal_(weight)
+        weight = torch.nn.init.xavier_normal_(weight)
 
 
     # Type of convolutional operation.
@@ -244,26 +252,23 @@ def convolutional(inputs, output_channels, filter_size, stride, padding, conv_ty
         # Weight filter initializer.
         weight = torch.nn.functional.pad(weight, (1, 1, 1, 1), mode='constant', value=0) # todo: check is correct # padding
         weight = weight[:, :, 1:, 1:] + weight[:, :, :-1, 1:] + weight[:, :, 1:, :-1] + weight[:, :, :-1, :-1] # shifts tensor
-        if spectral: weight = spectral_normalization(weight, power_iterations) # change format of stuff likely
+        if spectral: weight = spectral_normalization(weight, power_iterations) # todo: change format of stuff likely
         strides = (2, 2) # changed for pytorch
 
         # change padding type for pytorch
-        if padding=="SAME":
-            # padding_height = (stride - 1) + (weight.shape - 1) // 2 # weight shape may be wrong, need to check
-            # padding_width = (stride - 1) + (weight.shape - 1) // 2
-            # padding_torch = (padding_height, padding_width) # I think this is wrong
-            padding_torch = (weight.shape -1) //2
+        if padding=="SAME":# todo: change earlier
+            if stride > 1:
+                # mimicks padding in tf
+                # todo: check if inputs.shape[1] is correct
+                padding_torch= filter_size//2
+            else:
+                padding_torch = 'same'
         elif padding == "VALID":
-            padding_torch = 0
-
-        # calculate output padding
-        h_comp = (input.shape[2] - 1) * stride[0] -2 * padding_torch + weight_shape[0] # padding may cause issues
-        w_comp = (input.shape[3] - 1) * stride[0] -2 * padding_torch + weight_shape[1]
-        output_padding = (output_shape[2] - h_comp, output_shape[3] - w_comp)
+            padding_torch = 'valid'
 
         # Need to make sure output size is right, Just need to make weight right
         # weight = filter, output_shape is determined by stride, padding, output_padding and kernal size, data_format is always NCHW
-        output = torch.nn.functional.conv_transpose2d(input=input, weight=weight, stride=strides ,padding=padding_torch, output_padding=output_padding)
+        output = torch.nn.functional.conv_transpose2d(input=inputs, weight=weight, stride=strides ,padding=padding_torch, output_padding=output_padding)
 
     elif conv_type == 'downscale':
         # Weight filter initializer.
@@ -272,17 +277,25 @@ def convolutional(inputs, output_channels, filter_size, stride, padding, conv_ty
         if spectral: weight = spectral_normalization(weight, power_iterations)
         strides = (2, 2)
         # change padding type for pytorch
-        if padding=="SAME":
-            padding_torch = (weight.shape -1) //2
+        if padding=="SAME":# todo: change earlier
+            if stride > 1:
+                # mimicks padding in tf
+                # todo: check if inputs.shape[1] is correct
+                padding_torch= filter_size//2
+            else:
+                padding_torch = 'same'
         elif padding == "VALID":
-            padding_torch = 0
+            padding_torch = 'valid'
 
         # calculate output padding
-        h_comp = (input.shape[2] - 1) * stride[0] -2 * padding_torch + weight_shape[0] # padding may cause issues
-        w_comp = (input.shape[3] - 1) * stride[0] -2 * padding_torch + weight_shape[1]
-        output_padding = (output_shape[2] - h_comp, output_shape[3] - w_comp)# change padding type for pytorch
+        # h_comp = (inputs.shape[2] - 1) * stride[0] -2 * padding_torch + weight_shape[0] # padding may cause issues
+        # w_comp = (inputs.shape[3] - 1) * stride[0] -2 * padding_torch + weight_shape[1]
+        # output_padding = (output_shape[2] - h_comp, output_shape[3] - w_comp)# change padding type for pytorch
 
-        output = torch.nn.functional.conv2d(input=input, weight=weight, stride=strides ,padding=padding_torch)
+        if use_bias:
+            output = torch.nn.functional.conv2d(input=inputs, weight=weight, stride=stride, padding=padding_torch, bias=bias)
+        else:
+            output = torch.nn.functional.conv2d(input=inputs, weight=weight, stride=stride, padding=padding_torch)
 
     elif conv_type == 'transpose':
         output_shape = [torch.Tensor.size(inputs)[0], current_shape[1]*stride, current_shape[2]*stride, output_channels]
@@ -290,47 +303,49 @@ def convolutional(inputs, output_channels, filter_size, stride, padding, conv_ty
         if spectral: weight = spectral_normalization(weight, power_iterations)
 
         # change padding type for pytorch
-        if padding=="SAME":
-            padding_torch = (weight.shape -1) //2
+        if padding=="SAME":# todo: change earlier
+            if stride > 1:
+                # mimicks padding in tf
+                # todo: check if inputs.shape[1] is correct
+                padding_torch= filter_size//2
+            else:
+                padding_torch = 'same'
         elif padding == "VALID":
-            padding_torch = 0
+            padding_torch = 'valid'
 
-        # calculate output padding
-        h_comp = (input.shape[2] - 1) * stride[0] -2 * padding_torch + weight_shape[0] # padding may cause issues
-        w_comp = (input.shape[3] - 1) * stride[0] -2 * padding_torch + weight_shape[1]
-        output_padding = (output_shape[2] - h_comp, output_shape[3] - w_comp)
-
-        output = torch.nn.functional.conv_transpose2d(input=input, weight=weight, stride=strides ,padding=padding_torch, output_padding=output_padding)
+        output = torch.nn.functional.conv_transpose2d(input=inputs, weight=weight, stride=strides ,padding=padding_torch, output_padding=output_padding)
 
     elif conv_type == 'convolutional':
-        strides = (stride, stride)
         if spectral: weight = spectral_normalization(weight, power_iterations)
-
         # change padding type for pytorch
-        if padding=="SAME":
-            padding_torch = (weight.shape -1) //2
+        if padding=="SAME":# todo: change earlier
+            if stride > 1:
+                # mimicks padding in tf
+                # todo: check if inputs.shape[1] is correct
+                padding_torch= filter_size//2
+            else:
+                padding_torch = 'same'
         elif padding == "VALID":
-            padding_torch = 0
+            padding_torch = 'valid'
 
         # calculate output padding
-        h_comp = (input.shape[2] - 1) * stride[0] -2 * padding_torch + weight_shape[0] # padding may cause issues
-        w_comp = (input.shape[3] - 1) * stride[0] -2 * padding_torch + weight_shape[1]
-        output_padding = (output_shape[2] - h_comp, output_shape[3] - w_comp)# change padding type for pytorch
-
-        output = torch.nn.functional.conv2d(input=input, weight=weight, stride=strides ,padding=padding_torch)
-
-    if use_bias:
-        output = output + bias.unsqueeze(0) # todo: check how many dimentions output has as may need to add more unsqueeze
+        # h_comp = (inputs.shape[2] - 1) * stride -2 * padding_torch + weight_shape[0] # padding may cause issues
+        # w_comp = (inputs.shape[3] - 1) * stride -2 * padding_torch + weight_shape[1]
+        # output_padding = (output_shape[2] - h_comp, output_shape[3] - w_comp)# change padding type for pytorch
+        if use_bias:
+            output = torch.nn.functional.conv2d(input=inputs, weight=weight, stride=stride, padding=padding_torch, bias=bias)
+        else:
+            output = torch.nn.functional.conv2d(input=inputs, weight=weight, stride=stride, padding=padding_torch)
 
     if display:
         print('Conv Layer:     Scope=%15s Channels %5s Filter_size=%2s  Stride=%2s Padding=%6s Conv_type=%15s Output Shape: %s' %
               (str(scope)[:14], output_channels, filter_size, stride, padding, conv_type, output.shape))
-
+    model.set_weight(weight)
     return output
 
 
-def dense(inputs, out_dim, scope, use_bias=True, spectral=False, power_iterations=1, init='xavier', regularizer=None, display=True):
-    in_dim = inputs.get_shape()[-1]
+def dense(model, inputs, out_dim, scope, use_bias=True, spectral=False, power_iterations=1, init='xavier', regularizer=None, display=True):
+    in_dim = inputs.shape[1]
     t = torch.empty((in_dim, out_dim))
 
     if init=='normal':
@@ -348,39 +363,39 @@ def dense(inputs, out_dim, scope, use_bias=True, spectral=False, power_iteration
         output = torch.matmul(inputs, weights)
 
     if use_bias :
-        bias = torch.full((out_dim), 0.0, dtype=torch.float32)
+        bias = torch.full((out_dim,), 0.0)
         output = torch.add(output, bias)
+        model.set_bias(bias)
 
     if display:
-        print('Dens Layer:     Scope=%15s Channels %5s Output Shape: %s' % 
-            (str(scope)[:14], out_dim, output.shape))
+        print('Dens Layer:     Scope=%15s Channels %5s Output Shape: %s' %
+              (str(scope)[:14], out_dim, output.shape))
+    model.set_weight(weights)
 
     return output
 
 
-def residual_block(inputs, filter_size, stride, padding, scope, cond_label=None, is_training=True, normalization=None, noise_input_f=False, use_bias=True, spectral=False, activation=None,
+def residual_block(model, inputs, filter_size, stride, padding, scope, cond_label=None, is_training=True, normalization=None, noise_input_f=False, use_bias=True, spectral=False, activation=None,
                    style_extract_f=False, latent_dim=None, init='xavier', regularizer=None, power_iterations=1, display=True):
-    channels = inputs.shape.as_list()[-1]
-
+    channels = inputs.shape[1]
     # Convolutional
-    net = convolutional(inputs, channels, filter_size, stride, padding, 'convolutional', scope=1, spectral=spectral, init=init, regularizer=regularizer, power_iterations=power_iterations, display=False)
+    net = convolutional(model, inputs, channels, filter_size, stride, padding, 'convolutional', scope=1, spectral=spectral, init=init, regularizer=regularizer, power_iterations=power_iterations, display=False)
     if style_extract_f:
         style_1 = style_extract_2(inputs=net, latent_dim=latent_dim, spectral=spectral, init=init, regularizer=regularizer, scope=1)
     if noise_input_f:
-       net = noise_input(inputs=net, scope=1)
+        net = noise_input(model=model, inputs=net, scope=1)
     # Normalization
     if normalization is not None:
         net = normalization(inputs=net, training=is_training, c=cond_label, spectral=spectral, scope=1)
     # Activation
     if activation is not None: net = activation(net)
-        
 
     # Convolutional
-    net = convolutional(net, channels, filter_size, stride, padding, 'convolutional', scope=1, spectral=spectral, init=init, regularizer=regularizer, power_iterations=power_iterations, display=False)
+    net = convolutional(model, net, channels, filter_size, stride, padding, 'convolutional', scope=1, spectral=spectral, init=init, regularizer=regularizer, power_iterations=power_iterations, display=False)
     if style_extract_f:
         style_2 = style_extract_2(inputs=net, latent_dim=latent_dim, spectral=spectral, init=init, regularizer=regularizer, scope=2)
     if noise_input_f:
-       net = noise_input(inputs=net, scope=2)
+        net = noise_input(model=model, inputs=net, scope=2)
     # Normalization
     if normalization is not None:
         net = normalization(inputs=net, training=is_training, c=cond_label, spectral=spectral, scope=2)
@@ -391,7 +406,7 @@ def residual_block(inputs, filter_size, stride, padding, scope, cond_label=None,
 
     if display:
         print('ResN Layer:     Scope=%15s Channels %5s Filter_size=%2s  Stride=%2s Padding=%6s Conv_type=%15s Output Shape: %s' %
-        (str(scope)[:14], channels, filter_size, stride, padding, 'convolutional', output.shape))
+              (str(scope)[:14], channels, filter_size, stride, padding, 'convolutional', output.shape))
 
     if style_extract_f:
         style = style_1 + style_2
@@ -436,23 +451,23 @@ def residual_block_mod(inputs, filter_size, stride, padding, scope, cond_label=N
             # Convolutional
             net = conv_mod(inputs, cond_label, channels, filter_size, stride, padding, 'convolutional', scope=1, spectral=spectral, init=init, regularizer=regularizer, power_iterations=power_iterations, display=False)
             if noise_input_f:
-               net = noise_input(inputs=net, scope=1)
+                net = noise_input(inputs=net, scope=1)
             # Activation
             if activation is not None: net = activation(net)
-            
+
         with tf.variable_scope('part_2'):
             # Convolutional
             net = conv_mod(net, cond_label, channels, filter_size, stride, padding, 'convolutional', scope=1, spectral=spectral, init=init, regularizer=regularizer, power_iterations=power_iterations, display=False)
             if noise_input_f:
-               net = noise_input(inputs=net, scope=2)
+                net = noise_input(inputs=net, scope=2)
             # Activation
             if activation is not None: net = activation(net)
 
         output = inputs + net
 
         if display:
-            print('ResN Layer:     Scope=%15s Channels %5s Filter_size=%2s  Stride=%2s Padding=%6s Conv_type=%15s Output Shape: %s' % 
-            (str(scope)[:14], channels, filter_size, stride, padding, 'convolutional', output.shape))
+            print('ResN Layer:     Scope=%15s Channels %5s Filter_size=%2s  Stride=%2s Padding=%6s Conv_type=%15s Output Shape: %s' %
+                  (str(scope)[:14], channels, filter_size, stride, padding, 'convolutional', output.shape))
         return output
 
 
@@ -479,22 +494,22 @@ def conv_mod(inputs, label, output_channels, filter_size, stride, padding, conv_
         net = ReLU(net)
         style = dense(inputs=net, out_dim=input_channels, scope='beta', spectral=spectral, display=False)
 
-        
-        # Filter Shapes.
-        if 'convolutional' in conv_type: 
 
-            filter_shape = (filter_size, filter_size, input_channels, output_channels)    
+        # Filter Shapes.
+        if 'convolutional' in conv_type:
+
+            filter_shape = (filter_size, filter_size, input_channels, output_channels)
             # Weight and Bias Initialization.
-            bias   = tf.get_variable(name='bias',        shape=[output_channels], initializer=tf.constant_initializer(0.0), trainable=True, dtype=tf.float32) 
-            filter = tf.get_variable(name='filter_conv', shape=filter_shape,      initializer=weight_init,                  trainable=True, dtype=tf.float32, regularizer=regularizer)    
-            
+            bias   = tf.get_variable(name='bias',        shape=[output_channels], initializer=tf.constant_initializer(0.0), trainable=True, dtype=tf.float32)
+            filter = tf.get_variable(name='filter_conv', shape=filter_shape,      initializer=weight_init,                  trainable=True, dtype=tf.float32, regularizer=regularizer)
+
             # print('Input shape:', inputs.shape)
             if spectral: filter = spectral_normalization(filter, power_iterations)
 
             strides = [1, stride, stride, 1]
 
             # Add another dimension at the beginnig for batch.
-            filter_f = filter[np.newaxis] 
+            filter_f = filter[np.newaxis]
 
             # Filter Modulation.
             # Add dimensions to latent vector scale input feature map of filters: W'_i_j_k = S_j * w_i_j_k
@@ -512,13 +527,13 @@ def conv_mod(inputs, label, output_channels, filter_size, stride, padding, conv_
             output = tf.nn.conv2d(input=inputs, filter=tf.cast(filter, inputs.dtype), strides=strides, padding=padding, data_format='NCHW')
             output = tf.reshape(output, [-1, output_channels, height, width])
             output = tf.transpose(output, [0, 2, 3, 1])
-        
+
         output = tf.nn.bias_add(output, bias, data_format=data_format)
 
     if display:
-        print('Conv Layer:     Scope=%15s Channels %5s Filter_size=%2s  Stride=%2s Padding=%6s Conv_type=%15s Output Shape: %s' % 
-            (str(scope)[:14], output_channels, filter_size, stride, padding, conv_type, output.shape))
-    return output 
+        print('Conv Layer:     Scope=%15s Channels %5s Filter_size=%2s  Stride=%2s Padding=%6s Conv_type=%15s Output Shape: %s' %
+              (str(scope)[:14], output_channels, filter_size, stride, padding, conv_type, output.shape))
+    return output
 
 
 def lambda_network(x, scope, heads=4, dim_k=16, dim_u=1, m=23, spectral=True, init='xavier', regularizer=None, power_iterations=1, display=True):
@@ -549,7 +564,7 @@ def lambda_network(x, scope, heads=4, dim_k=16, dim_u=1, m=23, spectral=True, in
         q = convolutional(inputs=x, output_channels=heads*dim_k, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', spectral=spectral, init='normal', init_std=(dim_k*dim_v)**(-0.5),
                           regularizer=None, power_iterations=power_iterations, use_bias=False, scope=1, display=False)
         # Keys
-        k = convolutional(inputs=x, output_channels=dim_k*dim_u, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', spectral=spectral, init='normal', init_std=(dim_v)**(-0.5), 
+        k = convolutional(inputs=x, output_channels=dim_k*dim_u, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', spectral=spectral, init='normal', init_std=(dim_v)**(-0.5),
                           regularizer=None, power_iterations=power_iterations, use_bias=False, scope=2, display=False)
         # Values
         v = convolutional(inputs=x, output_channels=dim_v*dim_u, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', spectral=spectral, init='normal', init_std=(dim_v)**(-0.5),
@@ -610,25 +625,25 @@ def lambda_network(x, scope, heads=4, dim_k=16, dim_u=1, m=23, spectral=True, in
 
 
 def lambda_residual_block(inputs, filter_size, stride, padding, scope, cond_label=None, is_training=True, normalization=None, noise_input_f=False, spectral=False, activation=None,
-                   style_extract_f=False, latent_dim=None, init='xavier', regularizer=None, power_iterations=1, display=True):
+                          style_extract_f=False, latent_dim=None, init='xavier', regularizer=None, power_iterations=1, display=True):
     channels = inputs.shape.as_list()[-1]
     with tf.variable_scope('resblock_%s' % scope):
 
         # Conv 1x1
         with tf.variable_scope('part_1'):
             # Convolutional
-            net = convolutional(inputs, channels, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', scope=1, spectral=spectral, init=init, regularizer=regularizer, 
+            net = convolutional(inputs, channels, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', scope=1, spectral=spectral, init=init, regularizer=regularizer,
                                 power_iterations=power_iterations, display=False)
             if style_extract_f:
                 style_1 = style_extract(inputs=net, latent_dim=latent_dim, spectral=spectral, init=init, regularizer=regularizer, scope=1)
             if noise_input_f:
-               net = noise_input(inputs=net, scope=1)
+                net = noise_input(inputs=net, scope=1)
             # Normalization
-            if normalization is not None: 
+            if normalization is not None:
                 net = normalization(inputs=net, training=is_training, c=cond_label, spectral=spectral, scope=1)
             # Activation
             if activation is not None: net = activation(net)
-            
+
         # Lambda Network
         with tf.variable_scope('part_2'):
             # Convolutional
@@ -636,25 +651,25 @@ def lambda_residual_block(inputs, filter_size, stride, padding, scope, cond_labe
             if style_extract_f:
                 style_2 = style_extract(inputs=net, latent_dim=latent_dim, spectral=spectral, init=init, regularizer=regularizer, scope=2)
             if noise_input_f:
-               net = noise_input(inputs=net, scope=2)
+                net = noise_input(inputs=net, scope=2)
             # Normalization
-            if normalization is not None: 
+            if normalization is not None:
                 net = normalization(inputs=net, training=is_training, c=cond_label, spectral=spectral, scope=2)
             # Activation
             if activation is not None: net = activation(net)
 
         # Conv 1x1
         with tf.variable_scope('part_3'):
-            net = convolutional(net, channels, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', scope=1, spectral=spectral, init=init, regularizer=regularizer, 
+            net = convolutional(net, channels, filter_size=1, stride=1, padding='SAME', conv_type='convolutional', scope=1, spectral=spectral, init=init, regularizer=regularizer,
                                 power_iterations=power_iterations, display=False)
             if style_extract_f:
                 style_2 = style_extract(inputs=net, latent_dim=latent_dim, spectral=spectral, init=init, regularizer=regularizer, scope=2)
             if noise_input_f:
-               net = noise_input(inputs=net, scope=2)
+                net = noise_input(inputs=net, scope=2)
             # Normalization
-            if normalization is not None: 
+            if normalization is not None:
                 net = normalization(inputs=net, training=is_training, c=cond_label, spectral=spectral, scope=2)
-            
+
 
         output = inputs + net
 
@@ -662,9 +677,9 @@ def lambda_residual_block(inputs, filter_size, stride, padding, scope, cond_labe
         if activation is not None: output = activation(output)
 
         if display:
-            print('LambResN Layer: Scope=%15s Channels %5s Filter_size=%2s  Stride=%2s Padding=%6s Conv_type=%15s Output Shape: %s' % 
-            (str(scope)[:14], channels, filter_size, stride, padding, 'convolutional', output.shape))
-        
+            print('LambResN Layer: Scope=%15s Channels %5s Filter_size=%2s  Stride=%2s Padding=%6s Conv_type=%15s Output Shape: %s' %
+                  (str(scope)[:14], channels, filter_size, stride, padding, 'convolutional', output.shape))
+
         if style_extract_f:
             style = style_1 + style_2
             return output, style

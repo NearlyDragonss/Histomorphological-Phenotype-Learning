@@ -1,19 +1,16 @@
 import torch
 import tensorflow as tf
 import numpy as np
-import wandb
 
-from models.wandb_utils import save_model_config
 
-# try:
-# 	import wandb
-# 	from models.wandb_utils import *
-# 	wandb_flag = True
-# except:
-# 	wandb_flag = False
-# 	print('Not using W&B')
+try:
+    import wandb
+    from models.wandb_utils import *
+    wandb_flag = True
+except:
+    wandb_flag = False
+    print('Not using W&B')
 
-wandb_flag = False
 # Evaluation and Visualization lib.
 from models.evaluation.latent_space import *
 from models.evaluation.features import *
@@ -36,7 +33,8 @@ from models.ops import *
 from models.optimizer import *
 from models.loss import *
 
-from models.selfsupervised.BarlowTwinsNew import RepresentationsPathology
+from models.selfsupervised import BarlowTwins
+import torch.cuda
 
 class BarlowTwinsTraining():
     def __init__(self,
@@ -73,6 +71,9 @@ class BarlowTwinsTraining():
         self.learning_rate_e   = learning_rate_e
         self.beta_1            = beta_1
         self.temperature       = temperature # unsure use
+        self.conv_space_t1 = None
+        self.h_rep_t1 = None
+        self.z_rep_t1 = None
 
         ### Data augmentation conditions.
         # Spatial transformation.
@@ -135,7 +136,8 @@ class BarlowTwinsTraining():
         # Make sure the image batch is in the right format.
         images_trans = torch.reshape(images_trans, [-1, self.image_height, self.image_width, self.image_channels])
         images_trans = torch.clamp(images_trans, 0.0, 1.0)
-
+        images_trans = images_trans.permute(0,3,1,2)
+        images_trans.cuda()
         return images_trans
 
 
@@ -147,21 +149,23 @@ class BarlowTwinsTraining():
         return loss
 
     # Load data into tensors and augment the data
-    def data_loading(self, data):
-        avail_gpus = [torch.cuda.device(i) for i in range(torch.cuda.device_count())]
+    def data_loading(self, data, device):
 
         ################### INPUTS & DATA AUGMENTATION #####################################################################################################################################
         # Inputs.
         real_images_1, real_images_2 = self.model_inputs(data)
+
         # Data augmentation layer.
         real_images_1_t = self.data_augmentation_layer(images=real_images_1, crop=self.crop, rotation=self.rotation, flip=self.flip, g_blur=self.g_blur, g_noise=self.g_noise,
                                                        color_distort=self.color_distort, sobel_filter=self.sobel_filter)
         real_images_2_t = self.data_augmentation_layer(images=real_images_2, crop=self.crop, rotation=self.rotation, flip=self.flip, g_blur=self.g_blur, g_noise=self.g_noise,
                                                        color_distort=self.color_distort, sobel_filter=self.sobel_filter)
-        return [real_images_1_t, real_images_2_t]
+        real_images_1_t.to(device)
+        real_images_2_t.to(device)
+        return real_images_1_t, real_images_2_t
 
 
-    def project_subsample(self, model, data, epoch, data_out_path, report, batch_size=50):
+    def project_subsample(self, device, model, data, epoch, data_out_path, report, batch_size=50):
         # Updated
         if not report:
             return
@@ -176,35 +180,37 @@ class BarlowTwinsTraining():
 
         num_samples = 10000
 
+        print(type(self.conv_space_t1))
+        print(type(self.h_rep_t1))
+        print(type(self.z_rep_t1))
+
         # Setup HDF5 file.
         hdf5_path = os.path.join(epoch_path, 'hdf5_epoch_%s_projected_images.h5' % epoch)
         hdf5_file = h5py.File(hdf5_path, mode='w')
         img_storage  = hdf5_file.create_dataset(name='images',           shape=[num_samples, data.patch_h, data.patch_w, data.n_channels], dtype=np.float32)
-        conv_storage = hdf5_file.create_dataset(name='conv_features',    shape=[num_samples] + self.conv_space_t1.shape.as_list()[1:],     dtype=np.float32)
-        h_storage    = hdf5_file.create_dataset(name='h_representation', shape=[num_samples] + self.h_rep_t1.shape.as_list()[1:],          dtype=np.float32)
-        z_storage    = hdf5_file.create_dataset(name='z_representation', shape=[num_samples] + self.z_rep_t1.shape.as_list()[1:],          dtype=np.float32)
+        conv_storage = hdf5_file.create_dataset(name='conv_features',    shape=[num_samples] + list(self.conv_space_t1.shape[1:]),     dtype=np.float32) # set these
+        h_storage    = hdf5_file.create_dataset(name='h_representation', shape=[num_samples] + list(self.h_rep_t1.shape[1:]),          dtype=np.float32)
+        z_storage    = hdf5_file.create_dataset(name='z_representation', shape=[num_samples] + list(self.z_rep_t1.shape[1:]),          dtype=np.float32)
 
         ind = 0
         while ind<num_samples:
             images_batch = data.training.images[self.selected_indx[ind: ind+batch_size], :, :, :]
-            images_list = self.data_loading(images_batch)
+            real_images_1_t1, _ = self.data_loading(images_batch, device)
 
             # Model forward pass
-            train_1, _ = model.forward(images_list)
-            conv_space_out, h_rep_out, z_rep_out =  train_1
-
+            conv_space_out, h_rep_out, z_rep_out = model.forward(real_images_1_t1, True)
 
             img_storage[ind: ind+batch_size, :, : ,:]  = images_batch
-            conv_storage[ind: ind+batch_size, :] = conv_space_out
-            h_storage[ind: ind+batch_size, :]    = h_rep_out
-            z_storage[ind: ind+batch_size, :]    = z_rep_out
+            conv_storage[ind: ind+batch_size, :] = conv_space_out.detach()
+            h_storage[ind: ind+batch_size, :]    = h_rep_out.detach()
+            z_storage[ind: ind+batch_size, :]    = z_rep_out.detach()
             ind += batch_size
         try:
             conv_path, label_conv_path = report_progress_latent(epoch=epoch, w_samples=conv_storage, img_samples=img_storage, img_path=hdf5_path.split('/hdf5')[0], storage_name='conv_lat', metric='euclidean')
             h_path   , label_h_path    = report_progress_latent(epoch=epoch, w_samples=h_storage,    img_samples=img_storage, img_path=hdf5_path.split('/hdf5')[0], storage_name='h_lat',    metric='euclidean')
             z_path   , label_z_path    = report_progress_latent(epoch=epoch, w_samples=z_storage,    img_samples=img_storage, img_path=hdf5_path.split('/hdf5')[0], storage_name='z_lat',    metric='euclidean')
-            # if self.wandb_flag:
-            #     wandb.log({"Conv Space": wandb.Image(conv_path), "H Space":    wandb.Image(h_path), "Z Space":    wandb.Image(z_path)})
+            if self.wandb_flag:
+                wandb.log({"Conv Space": wandb.Image(conv_path), "H Space":    wandb.Image(h_path), "Z Space":    wandb.Image(z_path)})
         except Exception as ex:
             print('Issue printing latent space images. Epoch', epoch)
             if hasattr(ex, 'message'):
@@ -217,17 +223,30 @@ class BarlowTwinsTraining():
 
     # Training function.
     def training_func(self, epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=None, report=False): # uses data
-
         if self.wandb_flag:
-            # wandb.init() # todo: fix this
+            wandb.login(key="c13906296738f8d607f36930faa0617abbc65dc9")
             train_config = save_model_config(self, data)
             run_name = self.model_name + '-' + data.dataset
-            # wandb.init(project='SSL Pathology', entity='adalbertocquiros', name=run_name, config=train_config)
+            wandb.init(project='HPL', name=run_name, config=train_config)
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(device)
+        # Set GPU memory management similar to TensorFlow
+        torch.backends.cudnn.benchmark = True  # Optimizes performance for fixed input sizes
+        torch.backends.cudnn.enabled = True # Enables cuDNN acceleration (if available)
+        # Prevent PyTorch from allocating all GPU memory at once (equivalent to TF's allow_growth)
+        torch.cuda.empty_cache()  # Clears unused cached memory
+
         # Create Model
-        model = RepresentationsPathology(self.z_dim, self.spectral, self.layers, self.attention, self.model_name)
+        model = BarlowTwins.RepresentationsPathology(z_dim=self.z_dim, beta_1=self.beta_1, learning_rate_e=self.learning_rate_e, temperature=self.temperature,
+                                                     spectral=self.spectral, layers=self.layers, attention=self.attention, power_iterations=self.power_iterations,
+                                                     init=self.init, regularizer_scale=self.regularizer_scale, model_name=self.model_name)
+        model_params = list(model.parameters())
+        model.to(device)
 
         run_epochs = 0
-        torch.save(model.state_dict(), 'model_weights.pth')
+        torch.save(model, 'model_weights.pth')
+
 
         try:
             checkpoints, csvs = setup_output(data_out_path=data_out_path, model_name=self.model_name, restore=restore)
@@ -235,28 +254,18 @@ class BarlowTwinsTraining():
             setup_csvs(csvs=csvs, model=self, losses=losses)
             report_parameters(self, epochs, restore, data_out_path)
 
-
-
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu") # todo: might need to set
-            model.to(device)
-            # Set GPU memory management similar to TensorFlow
-            torch.backends.cudnn.benchmark = True  # Optimizes performance for fixed input sizes
-            torch.backends.cudnn.enabled = True # Enables cuDNN acceleration (if available)
-            # Prevent PyTorch from allocating all GPU memory at once (equivalent to TF's allow_growth)
-            torch.cuda.empty_cache()  # Clears unused cached memory
-
             # Define optimizer and loss
             #  Optimizer
-            opt = torch.optim.Adam(params=model.parameters(), lr=self.learning_rate_e, betas=(self.beta_1, 0.999)) #todo: define weight decay
+            opt = torch.optim.Adam(params=model_params, lr=self.learning_rate_e, betas=(self.beta_1, 0.999)) #todo: define weight decay
             # Learning rate decay.
             lr_decayed_fn = torch.optim.lr_scheduler.PolynomialLR(optimizer=opt, total_iters=3*self.num_samples,
                                                                   power= 0.5) # todo: look at diff in parameters
 
-
             print('Starting run.')
 
             # Training session
-            # wandb.watch(self, log_freq=100)
+            if self.wandb_flag:
+                wandb.watch(model, log_freq=100)
 
             # Restore previous session.
             if restore:
@@ -270,15 +279,14 @@ class BarlowTwinsTraining():
             data.training.reset()
 
             # transform the images
-            real_images_1_t1, real_images_1_t2 = self.data_loading(batch_images)
+            real_images_1_t1, real_images_1_t2 = self.data_loading(batch_images, device)
+            real_images_1_t1 = real_images_1_t1.permute(0,2,3,1)
+            real_images_1_t2 = real_images_1_t2.permute(0,2,3,1)
             write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_1.png'), data=real_images_1_t1, metadata=False)
             write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_2.png'), data=real_images_1_t2, metadata=False)
-
-            # if self.wandb_flag: # todo: fix me
-            #     dict_ = {"transformed_1": wandb.Image(os.path.join(data_out_path, 'images/transformed_1.png')), "transformed_2": wandb.Image(os.path.join(data_out_path, 'images/transformed_2.png'))}
-            #     wandb.log(dict_)
-
-
+            if self.wandb_flag: # todo: fix me
+                dict_ = {"transformed_1": wandb.Image(os.path.join(data_out_path, 'images/transformed_1.png')), "transformed_2": wandb.Image(os.path.join(data_out_path, 'images/transformed_2.png'))}
+                wandb.log(dict_)
 
             # Epoch Iteration.
             for epoch in range(0, epochs+1):
@@ -286,50 +294,45 @@ class BarlowTwinsTraining():
                 # Batch Iteration.
                 for batch_images, batch_labels in data.training:
                     # set it to training mode
-                    model.train()
-
+                    model.train() # todo: fix me
                     ################################# TRAINING ENCODER #################################################
                     # Update discriminator.
-                    images_list = self.data_loading(batch_images)
+                    images_1, images_2 = self.data_loading(batch_images, device)
 
                     # Model forward pass
-                    train_1, train_2 = model.forward(images_list)
-                    conv_space_t1, h_rep_t1, z_rep_t1 =  train_1
-                    conv_space_t2, h_rep_t2, z_rep_t2 =  train_2
+                    self.conv_space_t1, self.h_rep_t1, self.z_rep_t1 =  model.forward(images_1, True)
+                    conv_space_t2, h_rep_t2, z_rep_t2 =  model.forward(images_2, True)
 
                     ################### LOSS & OPTIMIZER ###############################################################
                     # Losses.
                     # Compute loss
-                    loss_contrastive = self.loss(rep_t1=z_rep_t1, rep_t2=z_rep_t2)
+                    loss_contrastive = self.loss(rep_t1=self.z_rep_t1, rep_t2=z_rep_t2)
                     # Optimization step
                     opt.zero_grad()
                     loss_contrastive.backward() # compute gradients
                     opt.step() # update params
                     # Learning rate decay step
                     lr_decayed_fn.step()
-
                     ####################################################################################################
                     # Print losses and Generate samples.
-                    model.eval() # set in validation mode
+                    # model.eval() # set in validation mode
                     if run_epochs % print_epochs == 0:
                         epoch_outputs = loss_contrastive.item()
 
                         with torch.no_grad():
                             for batch_images, batch_labels in data.validation: # todo: unsure if validation is corrrect
-                                images_list = self.data_loading(batch_images)
+                                eval_images_1, eval_images_2 = self.data_loading(batch_images, device)
 
                                 # Model forward pass
-                                train_1, train_2 = model.forward(images_list)
-                                conv_space_t1, h_rep_t1, z_rep_t1 =  train_1
-                                conv_space_t2, h_rep_t2, z_rep_t2 =  train_2
+                                self.conv_space_t1, self.h_rep_t1, self.z_rep_t1 =  model.forward(eval_images_1, False) # todo: unsure if false is correct
+                                conv_space_t2, h_rep_t2, z_rep_t2 =  model.forward(eval_images_2, False)
 
-                                loss_contrastive = self.loss(rep_t1=z_rep_t1, rep_t2=z_rep_t2)
+                                loss_contrastive = self.loss(rep_t1=self.z_rep_t1, rep_t2=z_rep_t2)
 
                                 val_outputs = loss_contrastive
 
-
-                                update_csv(model=self, file=csvs[0], variables=[epoch_outputs[0], val_outputs[0]], epoch=epoch, iteration=run_epochs, losses=losses)
-                                # if self.wandb_flag: wandb.log({'Redundancy Reduction Loss Train': epoch_outputs[0], 'Redundancy Reduction Loss Validation': val_outputs[0],})
+                                update_csv(model=self, file=csvs[0], variables=[epoch_outputs, val_outputs], epoch=epoch, iteration=run_epochs, losses=losses)
+                                if self.wandb_flag: wandb.log({'Redundancy Reduction Loss Train': epoch_outputs, 'Redundancy Reduction Loss Validation': val_outputs})
                                 break
                 # Save model.
                 torch.save(model.state_dict(), 'model_weights.pth')
@@ -338,7 +341,7 @@ class BarlowTwinsTraining():
                 ############################### FID TRACKING ##################################################
                 # Save checkpoint and generate images for FID every X epochs.
                 if (checkpoint_every is not None and epoch % checkpoint_every == 0) or (epochs==epoch):
-                    self.project_subsample(model=model, data=data, epoch=epoch, data_out_path=data_out_path, report=report)
+                    self.project_subsample(device=device, model=model, data=data, epoch=epoch, data_out_path=data_out_path, report=report)
 
 
 
@@ -348,5 +351,3 @@ class BarlowTwinsTraining():
                 torch.cuda.empty_cache()  # Clears unused cached memory
             else:
                 raise e  # Re-raise other exceptions
-        # if self.wandb_flag:
-        #     wandb.finish()

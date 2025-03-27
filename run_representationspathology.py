@@ -83,7 +83,7 @@ elif 'SimSiam' in model:
 elif 'Relational' in model:
 	from models.selfsupervised.RealReas import RepresentationsPathology
 elif 'BarlowTwins' in model:
-	from models.selfsupervised.BarlowTwins import RepresentationsPathology
+	from models.selfsupervised.BarlowTwinsTraining import BarlowTwinsTraining # todo: make better
 elif 'DINO' in model:
 	from models.selfsupervised.DINO import RepresentationsPathology
 
@@ -92,8 +92,14 @@ data = Data(dataset=dataset, marker=marker, patch_h=image_height, patch_w=image_
 
 # Run PathologyContrastive Encoder.
 with tf.Graph().as_default():
+	# # Instantiate Model.
+    # contrast_pathology = RepresentationsPathology(data=data, z_dim=z_dim, layers=layers, beta_1=beta_1, init=init, regularizer_scale=regularizer_scale, spectral=spectral, attention=attention,
+    # 							   			  	  learning_rate_e=learning_rate_e, model_name=model)
+	# # Train Model.
+    # losses = contrast_pathology.train(epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=check_every, report=report)
+
 	# Instantiate Model.
-    contrast_pathology = RepresentationsPathology(data=data, z_dim=z_dim, layers=layers, beta_1=beta_1, init=init, regularizer_scale=regularizer_scale, spectral=spectral, attention=attention,
+    contrast_pathology = BarlowTwinsTraining(data=data, z_dim=z_dim, layers=layers, beta_1=beta_1, init=init, regularizer_scale=regularizer_scale, spectral=spectral, attention=attention,
     							   			  	  learning_rate_e=learning_rate_e, model_name=model)
 	# Train Model.
-    losses = contrast_pathology.train(epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=check_every, report=report)
+    losses = contrast_pathology.training_func(epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=check_every, report=report)
