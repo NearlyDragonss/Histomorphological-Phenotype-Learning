@@ -3,7 +3,11 @@ from data_manipulation.data import Data
 import tensorflow as tf
 import argparse
 import os
+import time
+import sys
 
+# Logs errors
+sys.stderr = open("/root/nfs/refactor-hpl/Histomorphological-Phenotype-Learning/errors.txt", "w")
 # Folder permissions for cluster.
 os.umask(0o002)
 # H5 File bug over network file system.
@@ -26,7 +30,7 @@ parser.add_argument('--report',        dest='report',        action='store_true'
 args           = parser.parse_args()
 epochs         = args.epochs
 batch_size     = args.batch_size
-dataset        = args.set
+dataset        = args.dataset
 marker         = args.marker
 image_width    = args.img_size
 image_height   = args.img_size
@@ -93,13 +97,19 @@ data = Data(dataset=dataset, marker=marker, patch_h=image_height, patch_w=image_
 # Run PathologyContrastive Encoder.
 with tf.Graph().as_default():
 	# # Instantiate Model.
-    # contrast_pathology = RepresentationsPathology(data=data, z_dim=z_dim, layers=layers, beta_1=beta_1, init=init, regularizer_scale=regularizer_scale, spectral=spectral, attention=attention,
-    # 							   			  	  learning_rate_e=learning_rate_e, model_name=model)
+	# contrast_pathology = RepresentationsPathology(data=data, z_dim=z_dim, layers=layers, beta_1=beta_1, init=init, regularizer_scale=regularizer_scale, spectral=spectral, attention=attention,
+	# 							   			  	  learning_rate_e=learning_rate_e, model_name=model)
 	# # Train Model.
-    # losses = contrast_pathology.train(epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=check_every, report=report)
+	# losses = contrast_pathology.training_func(epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=check_every, report=report)
 
+	start = time.time()
 	# Instantiate Model.
-    contrast_pathology = BarlowTwinsTraining(data=data, z_dim=z_dim, layers=layers, beta_1=beta_1, init=init, regularizer_scale=regularizer_scale, spectral=spectral, attention=attention,
-    							   			  	  learning_rate_e=learning_rate_e, model_name=model)
+	contrast_pathology = BarlowTwinsTraining(data=data, z_dim=z_dim, layers=layers, beta_1=beta_1, init=init, regularizer_scale=regularizer_scale, spectral=spectral, attention=attention, learning_rate_e=learning_rate_e, model_name=model)
 	# Train Model.
-    losses = contrast_pathology.training_func(epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=check_every, report=report)
+	losses = contrast_pathology.training_func(epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=check_every, report=report)
+
+	end = time.time()
+	time_taken = end - start
+	f = open("~/nfs/refactor-hpl/Histomorphological-Phenotype-Learning/data_model_output/BarlowTwins_3/TCGA_PAAD_NO_NORM_TIFF_5x_40pc/h224_w224_n3_zdim128/time-taken.txt", "w")
+	f.write(time_taken)
+	f.close()
