@@ -148,7 +148,7 @@ def get_and_save_patch(augmentations, sets, hdf5_path, dataset_path, train_path,
 
         img_storage[index_patches] = augmented_patch
         label_storage[index_patches] = np.array(labels)
-        
+
         index_patches += 1
     hdf5_file.close()
     print()
@@ -187,38 +187,33 @@ def write_label_data(label_data, file_name):
 
 
 def write_sprite_image(data, filename=None, metadata=True, row_n=None):
-
+    np_data = data.numpy()
     if metadata:
         with open(filename.replace('gen_sprite.png', 'metadata.tsv'),'w') as f:
             f.write("Index\tLabel\n")
             for index in range(data.shape[0]):
                 f.write("%d\t%d\n" % (index,index))
-
     if len(data.shape) == 3:
-        data = np.tile(data[...,np.newaxis], (1,1,1,3))
-    data = data.astype(np.float32)
-    min = np.min(data.reshape((data.shape[0], -1)), axis=1)
-    data = (data.transpose(1,2,3,0) - min).transpose(3,0,1,2)
-    max = np.max(data.reshape((data.shape[0], -1)), axis=1)
-    data = (data.transpose(1,2,3,0) / max).transpose(3,0,1,2)
+        np_data = np.tile(np_data[...,np.newaxis], (1,1,1,3))
+    np_data = np_data.astype(np.float32)
+    min = np.min(np_data.reshape((np_data.shape[0], -1)), axis=1)
+    np_data = (np_data.transpose(1,2,3,0) - min).transpose(3,0,1,2)
+    max = np.max(np_data.reshape((np_data.shape[0], -1)), axis=1)
+    np_data = (np_data.transpose(1,2,3,0) / max).transpose(3,0,1,2)
     # Inverting the colors seems to look better for MNIST
     #data = 1 - data
-
-    n = int(np.ceil(np.sqrt(data.shape[0])))
-    padding = ((0, n ** 2 - data.shape[0]), (0, 0), (0, 0)) + ((0, 0),) * (data.ndim - 3)
-    data = np.pad(data, padding, mode='constant', constant_values=0)
-    
+    n = int(np.ceil(np.sqrt(np_data.shape[0])))
+    padding = ((0, n ** 2 - np_data.shape[0]), (0, 0), (0, 0)) + ((0, 0),) * (np_data.ndim - 3)
+    np_data = np.pad(np_data, padding, mode='constant', constant_values=0)
     # Tile the individual thumbnails into an image.
-    data = data.reshape((n, n) + data.shape[1:]).transpose((0, 2, 1, 3) + tuple(range(4, data.ndim + 1)))
-    data = data.reshape((n * data.shape[1], n * data.shape[3]) + data.shape[4:])
-    data = (data * 255).astype(np.uint8)
-    
-    if data.shape[-1] == 1:
-        data = data[:, :, 0]
+    np_data = np_data.reshape((n, n) + np_data.shape[1:]).transpose((0, 2, 1, 3) + tuple(range(4, np_data.ndim + 1)))
+    np_data = np_data.reshape((n * np_data.shape[1], n * np_data.shape[3]) + np_data.shape[4:])
+    np_data = (np_data * 255).astype(np.uint8)
+    if np_data.shape[-1] == 1:
+        np_data = np_data[:, :, 0]
     if filename is not None:
-        plt.imsave(filename, data)
-
-    return data
+        plt.imsave(filename, np_data)
+    return np_data
 
 
 def read_hdf5(path, dic):
@@ -247,7 +242,7 @@ def inception_feature_labels(hdf5, image_name, patch_h, patch_w, n_channels, num
 
     # If we already have the file, return labels.
     hdf5_features = hdf5.replace('.h', '_features_%s_%sclusters.h' % (set_type, num_clusters))
-    
+
     if not os.path.isfile(hdf5_features) and set_type == 'inception':
         # TensorFlow graph
         with tf.Graph().as_default():
@@ -257,21 +252,21 @@ def inception_feature_labels(hdf5, image_name, patch_h, patch_w, n_channels, num
             images -= 1
             images = tf.image.resize_bilinear(images, [299, 299])
             out_incept_v3 = tfgan.eval.run_inception(images=images, output_tensor='pool_3:0')
-            
+
             # Start session
             with tf.Session() as sess:
                 import umap
                 from sklearn.cluster import KMeans
                 print('Starting label clustering in Inception Space...')
                 with h5py.File(hdf5, mode='r') as hdf5_img_file:
-                    with h5py.File(hdf5_features, mode='w') as hdf5_features_file:        
+                    with h5py.File(hdf5_features, mode='w') as hdf5_features_file:
 
                         # Create storage for features.
                         images_storage = hdf5_img_file[image_name]
                         num_samples = images_storage.shape[0]
-                        batches = int(num_samples/batch_size)                        
+                        batches = int(num_samples/batch_size)
                         features_storage = hdf5_features_file.create_dataset(name='features', shape=(num_samples, 2048), dtype=np.float32)
-                        
+
                         # Get projections and save them.
                         print('Projecting images...')
                         ind = 0
@@ -291,7 +286,7 @@ def inception_feature_labels(hdf5, image_name, patch_h, patch_w, n_channels, num
                         all_indx = list(range(num_samples))
                         random.shuffle(all_indx)
                         selected_indx = np.array(sorted(all_indx[:int(num_samples*clust_percent)]))
-                        
+
                         # UMAP
                         print('Running UMAP...')
                         umap_reducer = umap.UMAP(n_components=2, random_state=45)
@@ -305,15 +300,15 @@ def inception_feature_labels(hdf5, image_name, patch_h, patch_w, n_channels, num
                         embedding_storage      = hdf5_features_file.create_dataset(name='embedding',           shape=[num_samples] + [2], dtype=np.float32)
                         kmeans = KMeans(init='k-means++', n_clusters=num_clusters, n_init=10).fit(embedding_umap_clustering)
                         new_classes = kmeans.predict(embedding_umap_clustering)
-                        
+
                         # Save storage for cluster labels.
                         for i in range(num_samples):
                             feature_labels_storage[i, :] = new_classes[i]
                             embedding_storage[i, :]      = embedding_umap_clustering[i, :]
 
-    with h5py.File(hdf5_features, mode='r') as hdf5_features_file: 
-        print(hdf5_features)     
-        print(hdf5_features_file.keys())     
+    with h5py.File(hdf5_features, mode='r') as hdf5_features_file:
+        print(hdf5_features)
+        print(hdf5_features_file.keys())
         new_labels     = np.array(hdf5_features_file['feat_cluster_labels'])
         labels         = copy.deepcopy(np.array(new_labels))
         if 'embedding' not in list(hdf5_features_file.keys()):

@@ -3,8 +3,16 @@ import tensorflow as tf
 from models.activations import *
 from models.ops import *
 
+import torch.nn as nn
+
 def batch_norm(inputs, training, c=None, spectral=False, scope=False):
-	output = tf.layers.batch_normalization(inputs=inputs, training=training)
+	input_dim = torch.Tensor.dim(inputs)
+	channels = inputs.shape[1]
+	if input_dim == 2 or input_dim == 3:
+		batch = nn.BatchNorm1d(channels)
+	elif input_dim == 4:
+		batch = nn.BatchNorm2d(channels)
+	output = batch(inputs)
 	return output
 
 def instance_norm(inputs, training, c=None, spectral=False, scope=False):
@@ -81,10 +89,10 @@ def conditional_batch_norm(inputs, training, c, scope, spectral=False):
 		if training:
 			if  len(input_dims) == 4:
 				batch_mean, batch_variance = tf.nn.moments(inputs, axes=[0, 1, 2])
-				# batch_mean, batch_variance = tf.nn.moments(inputs, axes=[0, 1, 2], keep_dims=True)
+			# batch_mean, batch_variance = tf.nn.moments(inputs, axes=[0, 1, 2], keep_dims=True)
 			else:
 				batch_mean, batch_variance = tf.nn.moments(inputs, axes=[0, 1])
-				# batch_mean, batch_variance = tf.nn.moments(inputs, axes=[0, 1], keep_dims=True)
+			# batch_mean, batch_variance = tf.nn.moments(inputs, axes=[0, 1], keep_dims=True)
 			ema_mean = tf.assign(test_mean, test_mean * decay + batch_mean * (1 - decay))
 			ema_variance = tf.assign(test_variance, test_variance * decay + batch_variance * (1 - decay))
 			with tf.control_dependencies([ema_mean, ema_variance]):
