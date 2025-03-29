@@ -1,5 +1,6 @@
 import os
 from data_manipulation.dataset import Dataset
+from data_manipulation.datasetPyTorch import DatasetPyTorch
 
 
 class Data:
@@ -24,19 +25,19 @@ class Data:
         print('Train Set:', self.hdf5_train)
         self.training = None
         if os.path.isfile(self.hdf5_train) and load:
-            self.training = Dataset(self.hdf5_train, patch_h, patch_w, n_channels, batch_size=batch_size, thresholds=thresholds, labels=labels, empty=empty, num_clusters=num_clusters, clust_percent=clust_percent)
+            self.training = DatasetPyTorch(self.hdf5_train, patch_h, patch_w, n_channels, batch_size=batch_size, thresholds=thresholds, labels=labels, empty=empty, num_clusters=num_clusters, clust_percent=clust_percent)
 
         # Validation dataset, some datasets work with those.
         self.hdf5_validation = os.path.join(self.pathes_path, 'hdf5_%s_validation.h5' % self.dataset_name)
         print('Validation Set:', self.hdf5_validation)
         self.validation = None
         if os.path.isfile(self.hdf5_validation) and load:
-            self.validation = Dataset(self.hdf5_validation, patch_h, patch_w, n_channels, batch_size=batch_size, thresholds=thresholds, labels=None, empty=empty)
+            self.validation = DatasetPyTorch(self.hdf5_validation, patch_h, patch_w, n_channels, batch_size=batch_size, thresholds=thresholds, labels=None, empty=empty)
 
         # Test dataset
         self.hdf5_test = os.path.join(self.pathes_path, 'hdf5_%s_test.h5' % self.dataset_name)
         print('Test Set:', self.hdf5_test)
         self.test = None
         if os.path.isfile(self.hdf5_test) and load:
-            self.test = Dataset(self.hdf5_test, patch_h, patch_w, n_channels, batch_size=batch_size, thresholds=thresholds, labels=None, empty=empty)
+            self.test = DatasetPyTorch(self.hdf5_test, patch_h, patch_w, n_channels, batch_size=batch_size, thresholds=thresholds, labels=None, empty=empty)
         print()

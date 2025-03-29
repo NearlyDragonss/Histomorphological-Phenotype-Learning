@@ -1,21 +1,22 @@
 import torch
 import tensorflow as tf
 import numpy as np
+wandb_flag = False
 
-
-try:
-    import wandb
-    from models.wandb_utils import *
-    wandb_flag = True
-except:
-    wandb_flag = False
-    print('Not using W&B')
+# try:
+#     import wandb
+#     from models.wandb_utils import *
+#     wandb_flag = True
+# except:
+#     wandb_flag = False
+#     print('Not using W&B')
 
 # Evaluation and Visualization lib.
 from models.evaluation.latent_space import *
 from models.evaluation.features import *
 
 # Data/Folder Manipulation lib.
+from torch.utils.data import DataLoader
 from data_manipulation.utils import *
 from models.evaluation import *
 from models.tools import *
@@ -278,30 +279,46 @@ class BarlowTwinsTraining():
             batch_images, batch_labels = data.training.next_batch(n_images)
             data.training.reset()
 
-            # transform the images
-            real_images_1_t1, real_images_1_t2 = self.data_loading(batch_images, device)
-            real_images_1_t1 = real_images_1_t1.permute(0,2,3,1)
-            real_images_1_t2 = real_images_1_t2.permute(0,2,3,1)
-            write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_1.png'), data=real_images_1_t1, metadata=False)
-            write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_2.png'), data=real_images_1_t2, metadata=False)
-            if self.wandb_flag: # todo: fix me
-                dict_ = {"transformed_1": wandb.Image(os.path.join(data_out_path, 'images/transformed_1.png')), "transformed_2": wandb.Image(os.path.join(data_out_path, 'images/transformed_2.png'))}
-                wandb.log(dict_)
+
+
+
+
+            dataloader = DataLoader(data, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=True) # todo: look at shuffle and num workers
+
+            i = 0
 
             # Epoch Iteration.
-            for epoch in range(0, epochs+1):
-
+            # for epoch in range(0, epochs+1): #todo: uncomment this
+            for epoch in range(0, 1):
                 # Batch Iteration.
-                for batch_images, batch_labels in data.training:
+                for batch_images, batch_labels in dataloader:
                     # set it to training mode
-                    model.train() # todo: fix me
+                    model.train()
                     ################################# TRAINING ENCODER #################################################
                     # Update discriminator.
                     images_1, images_2 = self.data_loading(batch_images, device)
 
+                    # show first transformation of images
+                    if epoch == 0:
+                        if i == 0:
+                            # transform the images # todo: put in if in first loop
+                            real_images_1_t1 = images_1.permute(0, 2, 3, 1)
+                            real_images_1_t2 = images_2.permute(0, 2, 3, 1)
+                            write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_1.png'),
+                                               data=real_images_1_t1, metadata=False)
+                            write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_2.png'),
+                                               data=real_images_1_t2, metadata=False)
+                            if self.wandb_flag:  # todo: fix me
+                                dict_ = {"transformed_1": wandb.Image(
+                                    os.path.join(data_out_path, 'images/transformed_1.png')),
+                                         "transformed_2": wandb.Image(
+                                             os.path.join(data_out_path, 'images/transformed_2.png'))}
+                                wandb.log(dict_)
+                        i+=1
+
                     # Model forward pass
-                    self.conv_space_t1, self.h_rep_t1, self.z_rep_t1 =  model.forward(images_1, True)
-                    conv_space_t2, h_rep_t2, z_rep_t2 =  model.forward(images_2, True)
+                    self.conv_space_t1, self.h_rep_t1, self.z_rep_t1 = model.forward(images_1, True)
+                    conv_space_t2, h_rep_t2, z_rep_t2 = model.forward(images_2, True)
 
                     ################### LOSS & OPTIMIZER ###############################################################
                     # Losses.

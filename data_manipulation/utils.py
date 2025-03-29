@@ -187,12 +187,13 @@ def write_label_data(label_data, file_name):
 
 
 def write_sprite_image(data, filename=None, metadata=True, row_n=None):
-    np_data = data.numpy()
+    np_data = data.detach().numpy()
     if metadata:
         with open(filename.replace('gen_sprite.png', 'metadata.tsv'),'w') as f:
             f.write("Index\tLabel\n")
             for index in range(data.shape[0]):
                 f.write("%d\t%d\n" % (index,index))
+
     if len(data.shape) == 3:
         np_data = np.tile(np_data[...,np.newaxis], (1,1,1,3))
     np_data = np_data.astype(np.float32)
