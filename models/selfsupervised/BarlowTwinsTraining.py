@@ -272,15 +272,7 @@ class BarlowTwinsTraining():
                 print('Restored model: %s' % check)
 
 
-            # Example of augmentation images.
-            # batch_images, batch_labels = data.training.next_batch(n_images)
-            # data.training.reset()
-
-
-
-
-
-            train_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=True) # todo: look at shuffle and num workers
+            train_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=False) # todo: look at shuffle and num workers
 
             i = 0
 
@@ -334,7 +326,7 @@ class BarlowTwinsTraining():
                         epoch_outputs = loss_contrastive.item()
 
                         with torch.no_grad():
-                            val_dataloader = DataLoader(data.taining, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=True) # todo: look at shuffle and num workers
+                            val_dataloader = DataLoader(data.taining, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=False) # todo: look at shuffle and num workers
 
                             for batch_images, batch_labels in val_dataloader: # todo: unsure if validation is corrrect
                                     eval_images_1, eval_images_2 = self.data_loading(batch_images, device)
