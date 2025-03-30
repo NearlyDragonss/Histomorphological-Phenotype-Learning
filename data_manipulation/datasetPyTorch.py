@@ -114,12 +114,11 @@ class DatasetPyTorch(Dataset):
         return batch_img/255.0, batch_labels
 
     def __len__(self):
-        print("hi")
-        print(self.size)
+
         return self.size # check is right
 
     def __getitem__(self, idx): # from https://discuss.pytorch.org/t/dataloader-when-num-worker-0-there-is-bug/25643/16
         if self.dataset is None:
-            self.dataset = h5py.File(self.hdf5_path, 'r')["dataset"]
+            self.dataset = h5py.File(self.hdf5_path, 'r')
 
         return self.dataset[idx]
