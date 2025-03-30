@@ -139,7 +139,7 @@ def attention_block_2(model, x, scope, spectral=True, init='xavier', regularizer
     h_flat = torch.reshape(h, shape=(x.shape[0], downsampled_n, h_channels))
 
     attn = torch.matmul(g_flat, f_flat.mT)
-    attn = torch.nn.functional.softmax(attn)
+    attn = torch.nn.functional.softmax(attn, dim=-1)
 
     o = torch.matmul(attn, h_flat)
     o = torch.reshape(o, shape=(x.shape[0], channels//2, height, width))

@@ -34,7 +34,7 @@ from models.ops import *
 from models.optimizer import *
 from models.loss import *
 
-from models.selfsupervised import BarlowTwins
+from models.selfsupervised import BarlowTwinsNew
 import torch.cuda
 
 class BarlowTwinsTraining():
@@ -103,6 +103,7 @@ class BarlowTwinsTraining():
     # Self-supervised inputs.
     def model_inputs(self, data):
         # Image input for transformation.
+        print(type(data))
         real_images_1 = torch.tensor(data, dtype=torch.float32)
         real_images_2 = torch.tensor(data, dtype=torch.float32)
 
@@ -161,6 +162,7 @@ class BarlowTwinsTraining():
                                                        color_distort=self.color_distort, sobel_filter=self.sobel_filter)
         real_images_2_t = self.data_augmentation_layer(images=real_images_2, crop=self.crop, rotation=self.rotation, flip=self.flip, g_blur=self.g_blur, g_noise=self.g_noise,
                                                        color_distort=self.color_distort, sobel_filter=self.sobel_filter)
+        print(real_images_1_t.device, real_images_2_t.device)
         real_images_1_t.to(device)
         real_images_2_t.to(device)
         return real_images_1_t, real_images_2_t
@@ -180,10 +182,6 @@ class BarlowTwinsTraining():
         shutil.copytree(checkpoint_path, check_epoch_path)
 
         num_samples = 10000
-
-        print(type(self.conv_space_t1))
-        print(type(self.h_rep_t1))
-        print(type(self.z_rep_t1))
 
         # Setup HDF5 file.
         hdf5_path = os.path.join(epoch_path, 'hdf5_epoch_%s_projected_images.h5' % epoch)
@@ -239,7 +237,7 @@ class BarlowTwinsTraining():
         torch.cuda.empty_cache()  # Clears unused cached memory
 
         # Create Model
-        model = BarlowTwins.RepresentationsPathology(z_dim=self.z_dim, beta_1=self.beta_1, learning_rate_e=self.learning_rate_e, temperature=self.temperature,
+        model = BarlowTwinsNew.RepresentationsPathology(z_dim=self.z_dim, beta_1=self.beta_1, learning_rate_e=self.learning_rate_e, temperature=self.temperature,
                                                      spectral=self.spectral, layers=self.layers, attention=self.attention, power_iterations=self.power_iterations,
                                                      init=self.init, regularizer_scale=self.regularizer_scale, model_name=self.model_name)
         model_params = list(model.parameters())
