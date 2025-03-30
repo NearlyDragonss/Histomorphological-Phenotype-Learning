@@ -276,14 +276,14 @@ class BarlowTwinsTraining():
 
 
             # Example of augmentation images.
-            batch_images, batch_labels = data.training.next_batch(n_images)
-            data.training.reset()
+            # batch_images, batch_labels = data.training.next_batch(n_images)
+            # data.training.reset()
 
 
 
 
 
-            dataloader = DataLoader(data, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=True) # todo: look at shuffle and num workers
+            train_dataloader = DataLoader(data.taining, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=True) # todo: look at shuffle and num workers
 
             i = 0
 
@@ -291,7 +291,7 @@ class BarlowTwinsTraining():
             # for epoch in range(0, epochs+1): #todo: uncomment this
             for epoch in range(0, 1):
                 # Batch Iteration.
-                for batch_images, batch_labels in dataloader:
+                for batch_images, batch_labels in train_dataloader:
                     # set it to training mode
                     model.train()
                     ################################# TRAINING ENCODER #################################################
@@ -337,20 +337,22 @@ class BarlowTwinsTraining():
                         epoch_outputs = loss_contrastive.item()
 
                         with torch.no_grad():
-                            for batch_images, batch_labels in data.validation: # todo: unsure if validation is corrrect
-                                eval_images_1, eval_images_2 = self.data_loading(batch_images, device)
+                            val_dataloader = DataLoader(data.taining, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=True) # todo: look at shuffle and num workers
 
-                                # Model forward pass
-                                self.conv_space_t1, self.h_rep_t1, self.z_rep_t1 =  model.forward(eval_images_1, False) # todo: unsure if false is correct
-                                conv_space_t2, h_rep_t2, z_rep_t2 =  model.forward(eval_images_2, False)
+                            for batch_images, batch_labels in val_dataloader: # todo: unsure if validation is corrrect
+                                    eval_images_1, eval_images_2 = self.data_loading(batch_images, device)
 
-                                loss_contrastive = self.loss(rep_t1=self.z_rep_t1, rep_t2=z_rep_t2)
+                                    # Model forward pass
+                                    self.conv_space_t1, self.h_rep_t1, self.z_rep_t1 =  model.forward(eval_images_1, False) # todo: unsure if false is correct
+                                    conv_space_t2, h_rep_t2, z_rep_t2 =  model.forward(eval_images_2, False)
 
-                                val_outputs = loss_contrastive
+                                    loss_contrastive = self.loss(rep_t1=self.z_rep_t1, rep_t2=z_rep_t2)
 
-                                update_csv(model=self, file=csvs[0], variables=[epoch_outputs, val_outputs], epoch=epoch, iteration=run_epochs, losses=losses)
-                                if self.wandb_flag: wandb.log({'Redundancy Reduction Loss Train': epoch_outputs, 'Redundancy Reduction Loss Validation': val_outputs})
-                                break
+                                    val_outputs = loss_contrastive
+
+                                    update_csv(model=self, file=csvs[0], variables=[epoch_outputs, val_outputs], epoch=epoch, iteration=run_epochs, losses=losses)
+                                    if self.wandb_flag: wandb.log({'Redundancy Reduction Loss Train': epoch_outputs, 'Redundancy Reduction Loss Validation': val_outputs})
+                                    break
                 # Save model.
                 torch.save(model.state_dict(), 'model_weights.pth')
                 data.training.reset()
