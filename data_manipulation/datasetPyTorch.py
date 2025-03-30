@@ -17,7 +17,7 @@ class DatasetPyTorch(Dataset):
         self.patch_h = patch_h
         self.patch_w = patch_w
         self.n_channels = n_channels
-        self.dataset = h5py.File(self.hdf5_path, 'r') # for use in loading data from https://discuss.pytorch.org/t/dataloader-when-num-worker-0-there-is-bug/25643/16
+        self.dataset = h5py.File(hdf5_path, 'r') # for use in loading data from https://discuss.pytorch.org/t/dataloader-when-num-worker-0-there-is-bug/25643/16
 
         # Options for conditional PathologyGAN
         self.num_clusters = num_clusters
