@@ -103,12 +103,8 @@ class BarlowTwinsTraining():
     # Self-supervised inputs.
     def model_inputs(self, data):
         # Image input for transformation.
-        print(type(data))
         real_images_1 = torch.tensor(data, dtype=torch.float32)
         real_images_2 = torch.tensor(data, dtype=torch.float32)
-        print("data shape")
-        print(data.shape)
-        # todo: fix shape
         real_images_1 = real_images_1.permute(0,3,1,2)
         real_images_2 = real_images_2.permute(0,3,1,2)
         return real_images_1, real_images_2,
@@ -144,7 +140,6 @@ class BarlowTwinsTraining():
         images_trans = torch.clamp(images_trans, 0.0, 1.0)
         # images_trans = images_trans.permute(0,3,1,2)
         # images_trans.cuda()
-        print(images_trans.shape)
         return images_trans
 
 
@@ -167,7 +162,6 @@ class BarlowTwinsTraining():
                                                        color_distort=self.color_distort, sobel_filter=self.sobel_filter)
         real_images_2_t = self.data_augmentation_layer(images=real_images_2, crop=self.crop, rotation=self.rotation, flip=self.flip, g_blur=self.g_blur, g_noise=self.g_noise,
                                                        color_distort=self.color_distort, sobel_filter=self.sobel_filter)
-        print(real_images_1_t.device, real_images_2_t.device)
         real_images_1_t.to(device)
         real_images_2_t.to(device)
         return real_images_1_t, real_images_2_t
