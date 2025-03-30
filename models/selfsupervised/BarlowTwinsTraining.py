@@ -109,6 +109,8 @@ class BarlowTwinsTraining():
         print("data shape")
         print(data.shape)
         # todo: fix shape
+        real_images_1 = real_images_1.permute(0,3,1,2)
+        real_images_2 = real_images_2.permute(0,3,1,2)
         return real_images_1, real_images_2,
 
     # Data Augmentation Layer.
