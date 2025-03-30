@@ -106,7 +106,8 @@ class BarlowTwinsTraining():
         print(type(data))
         real_images_1 = torch.tensor(data, dtype=torch.float32)
         real_images_2 = torch.tensor(data, dtype=torch.float32)
-        print(shape(data))
+        print("data shape")
+        print(data.shape)
         # todo: fix shape
         return real_images_1, real_images_2,
 
