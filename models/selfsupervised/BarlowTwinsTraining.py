@@ -106,7 +106,8 @@ class BarlowTwinsTraining():
         print(type(data))
         real_images_1 = torch.tensor(data, dtype=torch.float32)
         real_images_2 = torch.tensor(data, dtype=torch.float32)
-
+        print(shape(data))
+        # todo: fix shape
         return real_images_1, real_images_2,
 
     # Data Augmentation Layer.
@@ -136,10 +137,11 @@ class BarlowTwinsTraining():
         if sobel_filter:
             images_trans = map_func(random_sobel_filter, images_trans)
         # Make sure the image batch is in the right format.
-        images_trans = torch.reshape(images_trans, [-1, self.image_height, self.image_width, self.image_channels])
+        images_trans = torch.reshape(images_trans, [-1, self.image_channels, self.image_height, self.image_width])
         images_trans = torch.clamp(images_trans, 0.0, 1.0)
-        images_trans = images_trans.permute(0,3,1,2)
-        images_trans.cuda()
+        # images_trans = images_trans.permute(0,3,1,2)
+        # images_trans.cuda()
+        print(images_trans.shape)
         return images_trans
 
 

@@ -2,12 +2,16 @@ from configparser import Interpolation
 
 import torch
 import torchvision.transforms
+from sympy.parsing.sympy_parser import transformations
 from torchvision.transforms import v2, functional as f, InterpolationMode, RandomResizedCrop
 from skimage import color, io
 import tensorflow as tf
 import numpy as np
 import functools
 import random
+
+from torchvision.transforms.v2 import GaussianBlur
+
 
 # Transforms elems by applying fn to each element unstacked on axis 0 - copying tf.map_fn functionality
 def map_func(func, tensor):
@@ -161,10 +165,10 @@ def distorted_bounding_box_crop(image, bbox, min_object_covered=0.1, aspect_rati
     bbox_width = int(x_max - x_min)
 
     # Resizes and crops based on bbox parameters
-    perm_image = torch.permute(image, (2,0,1))
+    # perm_image = torch.permute(image, (2,0,1))
     transformation = torchvision.transforms.RandomResizedCrop(size=(bbox_height, bbox_width), ratio=aspect_ratio_range, scale=(min_object_covered, 1.0))
-    image = transformation(perm_image)
-    image = torch.permute(image, (1,2,0))
+    image = transformation(image)
+    # image = torch.permute(image, (1,2,0))
     return image
 
 # Crop and resize image.
@@ -175,7 +179,7 @@ def crop_and_resize(image, height, width, area_range):
     # [224, 224, 3]
     image = distorted_bounding_box_crop(image, bbox, min_object_covered=0.1, aspect_ratio_range=(3./4*aspect_ratio, 4./3.*aspect_ratio), area_range=area_range, max_attempts=100, scope=None)
     # [1,1,3])
-    image = torch.permute(image, (2,0,1))
+    # image = torch.permute(image, (2,0,1))
     image = torch.nn.functional.interpolate(image.unsqueeze(0), size=(height, width), mode="bicubic", align_corners=False)[0]
     # [1, 224, 224]
     return image
@@ -193,7 +197,7 @@ def random_crop_and_resize(image, prob=1.0):
 
 
 def random_crop_and_resize_p075(image, prob=1.0):
-    height, width, channels = list(image.shape)
+    channels, height, width = list(image.shape)
     def transformation(image):
         images = crop_and_resize(image=image, height=height, width=width, area_range=(0.75, 1.0))
         return images
@@ -237,31 +241,35 @@ def random_flip(image):
 ############### BLUR ###############
 
 def gaussian_blur(image, kernel_size, sigma, padding='same'):
-    radius = int(kernel_size/2)
-    kernel_size = radius * 2 + 1 # number
-    x = float(torch.arange(-radius, radius + 1)) # shape = [1,2,3,4,4,54,45,3]
-    blur_filter = torch.exp(-torch.pow(x, 2.0) / (2.0 * torch.pow(float(sigma), 2.0))) # an exponant number
-    blur_filter /= torch.sum(blur_filter) # a number
+    transformations = GaussianBlur(kernel_size=kernel_size, sigma=sigma)
+    blurred = transformations(image)
 
-    # One vertical and one horizontal filter.
-    blur_v = torch.reshape(blur_filter, [kernel_size, 1, 1, 1])
-    blur_h = torch.reshape(blur_filter, [1, kernel_size, 1, 1])
-    num_channels = torch.Tensor.size(image)[-1]
-    blur_h = torch.tile(blur_h, [1, 1, num_channels, 1])
-    blur_v = torch.tile(blur_v, [1, 1, num_channels, 1])
-    expand_batch_dim = image.shape.ndims == 3
-    if expand_batch_dim:
-        # Tensorflow requires batched input to convolutions, which we can fake with
-        # an extra dimension.
-        image = image.expand(1, list(image.size())[0]) # todo: could be wrong
-    blurred = torch.nn.functional.conv2d(image, blur_h, stride=(1,1,1,1), padding=padding)
-    blurred = torch.nn.functional.conv2d(blurred, blur_v, stride=(1,1,1,1), padding=padding)
-    if expand_batch_dim:
-        blurred = torch.squeeze(blurred, dim=0)
+
+    # radius = int(kernel_size/2)
+    # kernel_size = radius * 2 + 1 # number
+    # x = float(torch.arange(-radius, radius + 1)) # shape = [1,2,3,4,4,54,45,3]
+    # blur_filter = torch.exp(-torch.pow(x, 2.0) / (2.0 * torch.pow(float(sigma), 2.0))) # an exponant number
+    # blur_filter /= torch.sum(blur_filter) # a number
+    #
+    # # One vertical and one horizontal filter.
+    # blur_v = torch.reshape(blur_filter, [kernel_size, 1, 1, 1])
+    # blur_h = torch.reshape(blur_filter, [1, kernel_size, 1, 1])
+    # num_channels = torch.Tensor.size(image)[-1]
+    # blur_h = torch.tile(blur_h, [1, 1, num_channels, 1])
+    # blur_v = torch.tile(blur_v, [1, 1, num_channels, 1])
+    # expand_batch_dim = image.shape.ndims == 3
+    # if expand_batch_dim:
+    #     # Tensorflow requires batched input to convolutions, which we can fake with
+    #     # an extra dimension.
+    #     image = image.expand(1, list(image.size())[0]) # todo: could be wrong
+    # blurred = torch.nn.functional.conv2d(image, blur_h, stride=(1,1,1,1), padding=padding)
+    # blurred = torch.nn.functional.conv2d(blurred, blur_v, stride=(1,1,1,1), padding=padding)
+    # if expand_batch_dim:
+    #     blurred = torch.squeeze(blurred, dim=0)
     return blurred
 
 def random_blur(image, p=0.5):
-    height, width, channels = image.shape.as_list()
+    channels, height, width = image.shape.as_list()
     del width
     def _transform(image):
         sigma = (2.0-0.1)*torch.rand(()) + 0.1
@@ -274,12 +282,15 @@ def random_blur(image, p=0.5):
 # Adds gaussian noise to an image.
 def add_gaussian_noise(image):
     # image must be scaled in [0, 1]
-    # with tf.name_scope('Add_gaussian_noise'): # todo: revisit
-    noise =  torch.empty(size=torch.Tensor.size(image), dtype=torch.float32).normal_(mean=0.0,std=(50)/(255))
+    # noise =  torch.empty(size=torch.Tensor.size(image), dtype=torch.float32).normal_(mean=0.0,std=(50)/(255))
+    #
+    #
+    # noise_img = image + noise
+    # noise_img = torch.clamp(noise_img, 0.0, 1.0)
 
+    translation = v2.GaussianNoise(mean=0.0, sigma=(50)/(255), clip=True)
+    noise_img = translation(image)
 
-    noise_img = image + noise
-    noise_img = torch.clamp(noise_img, 0.0, 1.0)
     return noise_img
 
 # Adds gaussian noise randomly to image.
