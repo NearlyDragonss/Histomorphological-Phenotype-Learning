@@ -17,8 +17,8 @@ class DatasetPyTorch(Dataset):
         self.patch_h = patch_h
         self.patch_w = patch_w
         self.n_channels = n_channels
-        print(h5py.File(hdf5_path, 'r').keys())
-        self.dataset = h5py.File(hdf5_path, 'r') # for use in loading data from https://discuss.pytorch.org/t/dataloader-when-num-worker-0-there-is-bug/25643/16
+        # print(h5py.File(hdf5_path, 'r').keys())
+        # self.dataset = h5py.File(hdf5_path, 'r') # for use in loading data from https://discuss.pytorch.org/t/dataloader-when-num-worker-0-there-is-bug/25643/16
 
         # Options for conditional PathologyGAN
         self.num_clusters = num_clusters
@@ -97,26 +97,28 @@ class DatasetPyTorch(Dataset):
         adapted[i] = label if len(adapted) == 1 else 1.0
         return adapted
 
-    def next_batch(self, n):
-        if self.done:
-            self.done = False
-            raise StopIteration
-        batch_img = self.images[self.i:self.i + n]
-        batch_labels = self.labels[self.i:self.i + n]
-        self.i += len(batch_img)
-        delta = n - len(batch_img)
-        if delta == n:
-            raise StopIteration
-        if 0 < delta:
-            batch_img = np.concatenate((batch_img, self.images[:delta]), axis=0)
-            batch_labels = np.concatenate((batch_labels, self.labels[:delta]), axis=0)
-            self.i = delta
-            self.done = True
-        return batch_img/255.0, batch_labels
+    # def next_batch(self, n):
+    #     if self.done:
+    #         self.done = False
+    #         raise StopIteration
+    #     batch_img = self.images[self.i:self.i + n]
+    #     batch_labels = self.labels[self.i:self.i + n]
+    #     self.i += len(batch_img)
+    #     delta = n - len(batch_img)
+    #     if delta == n:
+    #         raise StopIteration
+    #     if 0 < delta:
+    #         batch_img = np.concatenate((batch_img, self.images[:delta]), axis=0)
+    #         batch_labels = np.concatenate((batch_labels, self.labels[:delta]), axis=0)
+    #         self.i = delta
+    #         self.done = True
+    #     return batch_img/255.0, batch_labels
 
     def __len__(self):
 
         return self.size # check is right
 
-    def __getitem__(self, idx): # from https://discuss.pytorch.org/t/dataloader-when-num-worker-0-there-is-bug/25643/16
-        return self.dataset[idx]
+    def __getitem__(self, idx):
+        batch_images = self.images[idx] /255.0
+        batch_labels = self.labels[idx]
+        return batch_images, batch_labels
