@@ -283,7 +283,7 @@ class BarlowTwinsTraining():
 
 
 
-            train_dataloader = DataLoader(data.taining, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=True) # todo: look at shuffle and num workers
+            train_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=True) # todo: look at shuffle and num workers
 
             i = 0
 
