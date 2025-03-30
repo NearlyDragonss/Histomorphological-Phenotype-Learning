@@ -34,7 +34,7 @@ from models.ops import *
 from models.optimizer import *
 from models.loss import *
 
-from models.selfsupervised import BarlowTwinsNew
+from models.selfsupervised import BarlowTwins
 import torch.cuda
 
 class BarlowTwinsTraining():
@@ -239,7 +239,7 @@ class BarlowTwinsTraining():
         torch.cuda.empty_cache()  # Clears unused cached memory
 
         # Create Model
-        model = BarlowTwinsNew.RepresentationsPathology(z_dim=self.z_dim, beta_1=self.beta_1, learning_rate_e=self.learning_rate_e, temperature=self.temperature,
+        model = BarlowTwins.RepresentationsPathology(z_dim=self.z_dim, beta_1=self.beta_1, learning_rate_e=self.learning_rate_e, temperature=self.temperature,
                                                      spectral=self.spectral, layers=self.layers, attention=self.attention, power_iterations=self.power_iterations,
                                                      init=self.init, regularizer_scale=self.regularizer_scale, model_name=self.model_name)
         model_params = list(model.parameters())
