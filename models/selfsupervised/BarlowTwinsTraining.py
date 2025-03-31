@@ -276,6 +276,8 @@ class BarlowTwinsTraining():
 
             # Epoch Iteration.
             for epoch in range(0, epochs+1):
+                if self.wandb_flag:
+                    wandb.log({'Epoch': epoch})
                 # Batch Iteration.
                 for batch_images, batch_labels in train_dataloader:
                     # set it to training mode
