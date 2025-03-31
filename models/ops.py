@@ -330,11 +330,6 @@ def convolutional(model, inputs, output_channels, filter_size, stride, padding, 
         # w_comp = (inputs.shape[3] - 1) * stride -2 * padding_torch + weight_shape[1]
         # output_padding = (output_shape[2] - h_comp, output_shape[3] - w_comp)# change padding type for pytorch
         if use_bias:
-            print(inputs.dtype)
-            print(inputs.shape)
-            print(weight.dtype)
-            print(weight.shape)
-
             output = torch.nn.functional.conv2d(input=inputs, weight=weight, stride=stride, padding=padding_torch, bias=bias)
         else:
             output = torch.nn.functional.conv2d(input=inputs, weight=weight, stride=stride, padding=padding_torch)
