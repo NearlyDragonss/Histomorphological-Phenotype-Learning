@@ -220,7 +220,7 @@ class BarlowTwinsTraining():
     # Training function.
     def training_func(self, epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=None, report=False): # uses data
         if self.wandb_flag:
-            wandb.login(key="c13906296738f8d607f36930faa0617abbc65dc9")
+            wandb.login()
             train_config = save_model_config(self, data)
             run_name = self.model_name + '-' + data.dataset
             wandb.init(project='HPL', name=run_name, config=train_config)
