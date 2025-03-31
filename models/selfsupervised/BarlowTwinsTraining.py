@@ -1,15 +1,14 @@
 import torch
 import tensorflow as tf
 import numpy as np
-wandb_flag = False
 
-# try:
-#     import wandb
-#     from models.wandb_utils import *
-#     wandb_flag = True
-# except:
-#     wandb_flag = False
-#     print('Not using W&B')
+try:
+    import wandb
+    from models.wandb_utils import *
+    wandb_flag = True
+except:
+    wandb_flag = False
+    print('Not using W&B')
 
 # Evaluation and Visualization lib.
 from models.evaluation.latent_space import *
