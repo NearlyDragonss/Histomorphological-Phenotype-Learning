@@ -151,7 +151,7 @@ def attention_block_2(model, x, scope, spectral=True, init='xavier', regularizer
 
     if display:
         print('Atv2 Layer:     Scope=%15s Channels %5s Output Shape: %s' %
-              (str(scope)[:14], channels, y.shape))
+              (str(scope)[:14], channels, list(y.shape)))
 
     return y
 
@@ -223,17 +223,14 @@ def convolutional(model, inputs, output_channels, filter_size, stride, padding, 
     current_shape = inputs.shape
     input_channels = current_shape[1]
 
-    # print(output_channels)
     if 'transpose'in conv_type or 'upscale' in conv_type: weight_shape = (input_channels, output_channels, filter_size, filter_size) # fix this for transpose
     else: weight_shape = (output_channels, input_channels, filter_size, filter_size)
-
-
 
     # Weight and Bias Initialization.
     bias = torch.full(size=(output_channels,), fill_value=0.0)
     model.set_bias(bias)
 
-    weight = torch.randn(weight_shape) * 0.01 # todo: check this is right
+    weight = torch.randn(weight_shape) * 0.01
 
     # Weight Initializer
     if init=='normal':
@@ -333,13 +330,18 @@ def convolutional(model, inputs, output_channels, filter_size, stride, padding, 
         # w_comp = (inputs.shape[3] - 1) * stride -2 * padding_torch + weight_shape[1]
         # output_padding = (output_shape[2] - h_comp, output_shape[3] - w_comp)# change padding type for pytorch
         if use_bias:
+            print(inputs.dtype)
+            print(inputs.shape)
+            print(weight.dtype)
+            print(weight.shape)
+
             output = torch.nn.functional.conv2d(input=inputs, weight=weight, stride=stride, padding=padding_torch, bias=bias)
         else:
             output = torch.nn.functional.conv2d(input=inputs, weight=weight, stride=stride, padding=padding_torch)
 
     if display:
         print('Conv Layer:     Scope=%15s Channels %5s Filter_size=%2s  Stride=%2s Padding=%6s Conv_type=%15s Output Shape: %s' %
-              (str(scope)[:14], output_channels, filter_size, stride, padding, conv_type, output.shape))
+              (str(scope)[:14], output_channels, filter_size, stride, padding, conv_type, list(output.shape)))
     model.set_weight(weight)
     return output
 
@@ -369,7 +371,7 @@ def dense(model, inputs, out_dim, scope, use_bias=True, spectral=False, power_it
 
     if display:
         print('Dens Layer:     Scope=%15s Channels %5s Output Shape: %s' %
-              (str(scope)[:14], out_dim, output.shape))
+              (str(scope)[:14], out_dim, list(output.shape)))
     model.set_weight(weights)
 
     return output
@@ -406,7 +408,7 @@ def residual_block(model, inputs, filter_size, stride, padding, scope, cond_labe
 
     if display:
         print('ResN Layer:     Scope=%15s Channels %5s Filter_size=%2s  Stride=%2s Padding=%6s Conv_type=%15s Output Shape: %s' %
-              (str(scope)[:14], channels, filter_size, stride, padding, 'convolutional', output.shape))
+              (str(scope)[:14], channels, filter_size, stride, padding, 'convolutional', list(output.shape)))
 
     if style_extract_f:
         style = style_1 + style_2
@@ -440,7 +442,7 @@ def residual_block_dense(inputs, scope, cond_label=None, is_training=True, norma
         output = inputs + net
 
         if display:
-            print('ResN Layer:     Scope=%15s Channels %5s Output Shape: %s' % (str(scope)[:14], channels, output.shape))
+            print('ResN Layer:     Scope=%15s Channels %5s Output Shape: %s' % (str(scope)[:14], channels, list(output.shape)))
         return output
 
 
@@ -467,7 +469,7 @@ def residual_block_mod(inputs, filter_size, stride, padding, scope, cond_label=N
 
         if display:
             print('ResN Layer:     Scope=%15s Channels %5s Filter_size=%2s  Stride=%2s Padding=%6s Conv_type=%15s Output Shape: %s' %
-                  (str(scope)[:14], channels, filter_size, stride, padding, 'convolutional', output.shape))
+                  (str(scope)[:14], channels, filter_size, stride, padding, 'convolutional', list(output.shape)))
         return output
 
 
@@ -503,7 +505,6 @@ def conv_mod(inputs, label, output_channels, filter_size, stride, padding, conv_
             bias   = tf.get_variable(name='bias',        shape=[output_channels], initializer=tf.constant_initializer(0.0), trainable=True, dtype=tf.float32)
             filter = tf.get_variable(name='filter_conv', shape=filter_shape,      initializer=weight_init,                  trainable=True, dtype=tf.float32, regularizer=regularizer)
 
-            # print('Input shape:', inputs.shape)
             if spectral: filter = spectral_normalization(filter, power_iterations)
 
             strides = [1, stride, stride, 1]

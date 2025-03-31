@@ -200,9 +200,7 @@ def write_sprite_image(data, filename=None, metadata=True, row_n=None):
     min = np.min(np_data.reshape((np_data.shape[0], -1)), axis=1)
     np_data = (np_data.transpose(1,2,3,0) - min).transpose(3,0,1,2)
     max = np.max(np_data.reshape((np_data.shape[0], -1)), axis=1)
-    print(np_data.transpose(1,2,3,0))
-    print(max)
-    np_data = (np_data.transpose(1,2,3,0) / max).transpose(3,0,1,2)
+    np_data = (np_data.transpose(1,2,3,0) / max[np.newaxis, np.newaxis, np.newaxis, :]).transpose(3,0,1,2)
     # Inverting the colors seems to look better for MNIST
     #data = 1 - data
     n = int(np.ceil(np.sqrt(np_data.shape[0])))

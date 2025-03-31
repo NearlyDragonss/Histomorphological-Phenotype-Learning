@@ -103,10 +103,9 @@ class BarlowTwinsTraining():
     # Self-supervised inputs.
     def model_inputs(self, data):
         # Image input for transformation.
-        real_images_1 = torch.tensor(data, dtype=torch.float32)
-        real_images_2 = torch.tensor(data, dtype=torch.float32)
-        real_images_1 = real_images_1.permute(0,3,1,2)
-        real_images_2 = real_images_2.permute(0,3,1,2)
+        data = data.float()
+        real_images_1 = data.permute(0,3,1,2)
+        real_images_2 = data.permute(0,3,1,2)
         return real_images_1, real_images_2,
 
     # Data Augmentation Layer.
@@ -254,7 +253,7 @@ class BarlowTwinsTraining():
 
             # Define optimizer and loss
             #  Optimizer
-            opt = torch.optim.Adam(params=model_params, lr=self.learning_rate_e, betas=(self.beta_1, 0.999)) #todo: define weight decay
+            opt = torch.optim.Adam(params=model_params, lr=self.learning_rate_e, betas=(self.beta_1, 0.999))
             # Learning rate decay.
             lr_decayed_fn = torch.optim.lr_scheduler.PolynomialLR(optimizer=opt, total_iters=3*self.num_samples,
                                                                   power= 0.5) # todo: look at diff in parameters
@@ -272,13 +271,12 @@ class BarlowTwinsTraining():
                 print('Restored model: %s' % check)
 
 
-            train_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=False) # todo: look at shuffle and num workers
+            train_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=False)
 
             i = 0
 
             # Epoch Iteration.
-            # for epoch in range(0, epochs+1): #todo: uncomment this
-            for epoch in range(0, 1):
+            for epoch in range(0, epochs+1):
                 # Batch Iteration.
                 for batch_images, batch_labels in train_dataloader:
                     # set it to training mode
@@ -286,7 +284,6 @@ class BarlowTwinsTraining():
                     ################################# TRAINING ENCODER #################################################
                     # Update discriminator.
                     images_1, images_2 = self.data_loading(batch_images, device)
-
                     # show first transformation of images
                     if epoch == 0:
                         if i == 0:
@@ -297,6 +294,7 @@ class BarlowTwinsTraining():
                                                data=real_images_1_t1, metadata=False)
                             write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_2.png'),
                                                data=real_images_1_t2, metadata=False)
+
                             if self.wandb_flag:  # todo: fix me
                                 dict_ = {"transformed_1": wandb.Image(
                                     os.path.join(data_out_path, 'images/transformed_1.png')),
@@ -326,13 +324,13 @@ class BarlowTwinsTraining():
                         epoch_outputs = loss_contrastive.item()
 
                         with torch.no_grad():
-                            val_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=False) # todo: look at shuffle and num workers
+                            val_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=False)
 
                             for batch_images, batch_labels in val_dataloader: # todo: unsure if validation is corrrect
                                     eval_images_1, eval_images_2 = self.data_loading(batch_images, device)
 
                                     # Model forward pass
-                                    self.conv_space_t1, self.h_rep_t1, self.z_rep_t1 =  model.forward(eval_images_1, False) # todo: unsure if false is correct
+                                    self.conv_space_t1, self.h_rep_t1, self.z_rep_t1 =  model.forward(eval_images_1, False)
                                     conv_space_t2, h_rep_t2, z_rep_t2 =  model.forward(eval_images_2, False)
 
                                     loss_contrastive = self.loss(rep_t1=self.z_rep_t1, rep_t2=z_rep_t2)

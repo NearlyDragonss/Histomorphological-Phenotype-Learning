@@ -104,7 +104,6 @@ def setup_csvs(csvs, model, losses, restore=False):
     if not restore:
         header = ['Epoch', 'Iteration']
         header.extend(losses)
-        print(loss_csv)
         with open(loss_csv, 'w') as csv_file:
             writer = csv.DictWriter(csv_file, fieldnames=header)
             writer.writeheader()
