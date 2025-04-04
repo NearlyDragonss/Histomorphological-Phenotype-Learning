@@ -276,7 +276,7 @@ class BarlowTwinsTraining():
                 print('Restored model: %s' % check)
 
 
-            train_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=True)
+            train_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=0, pin_memory=True)
 
             i = 0
 
@@ -333,7 +333,7 @@ class BarlowTwinsTraining():
                         epoch_outputs = loss_contrastive.item()
 
                         with torch.no_grad():
-                            val_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=True)
+                            val_dataloader = DataLoader(data.validation, batch_size=self.batch_size, shuffle=False, num_workers=0, pin_memory=True)
 
                             for batch_images, batch_labels in val_dataloader: # todo: unsure if validation is corrrect
                                     eval_images_1, eval_images_2 = self.data_loading(batch_images, device)
