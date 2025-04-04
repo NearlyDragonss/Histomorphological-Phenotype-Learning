@@ -2,7 +2,7 @@ from models.ops import *
 import tensorflow as tf
 from torch import nn
 
-display = True
+display = False #todo change back
 
 class EncoderResnetContrastive(torch.nn.Module):
 	def __init__(self, model_name, z_dim, h_dim, layers, spectral, activation, init='xavier',

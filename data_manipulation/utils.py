@@ -187,7 +187,7 @@ def write_label_data(label_data, file_name):
 
 
 def write_sprite_image(data, filename=None, metadata=True, row_n=None):
-    np_data = data.detach().numpy()
+    np_data = data.cpu().detach().numpy()
     if metadata:
         with open(filename.replace('gen_sprite.png', 'metadata.tsv'),'w') as f:
             f.write("Index\tLabel\n")

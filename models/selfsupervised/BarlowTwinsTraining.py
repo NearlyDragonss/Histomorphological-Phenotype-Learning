@@ -102,10 +102,11 @@ class BarlowTwinsTraining():
     # Self-supervised inputs.
     def model_inputs(self, data):
         # Image input for transformation.
-        data = data.float()
+        if not torch.is_tensor(data):
+            data = torch.from_numpy(data)
         real_images_1 = data.permute(0,3,1,2)
         real_images_2 = data.permute(0,3,1,2)
-        return real_images_1, real_images_2,
+        return real_images_1, real_images_2
 
     # Data Augmentation Layer.
     def data_augmentation_layer(self, images, crop, rotation, flip, g_blur, g_noise, color_distort, sobel_filter):
@@ -136,8 +137,6 @@ class BarlowTwinsTraining():
         # Make sure the image batch is in the right format.
         images_trans = torch.reshape(images_trans, [-1, self.image_channels, self.image_height, self.image_width])
         images_trans = torch.clamp(images_trans, 0.0, 1.0)
-        # images_trans = images_trans.permute(0,3,1,2)
-        # images_trans.cuda()
         return images_trans
 
 
@@ -160,8 +159,8 @@ class BarlowTwinsTraining():
                                                        color_distort=self.color_distort, sobel_filter=self.sobel_filter)
         real_images_2_t = self.data_augmentation_layer(images=real_images_2, crop=self.crop, rotation=self.rotation, flip=self.flip, g_blur=self.g_blur, g_noise=self.g_noise,
                                                        color_distort=self.color_distort, sobel_filter=self.sobel_filter)
-        real_images_1_t.to(device)
-        real_images_2_t.to(device)
+        real_images_1_t = real_images_1_t.to(device)
+        real_images_2_t = real_images_2_t.to(device)
         return real_images_1_t, real_images_2_t
 
 
@@ -175,15 +174,15 @@ class BarlowTwinsTraining():
         epoch_path = os.path.join(results_path, 'epoch_%s' % epoch)
         check_epoch_path = os.path.join(epoch_path, 'checkpoints')
         checkpoint_path = os.path.join(results_path, '../checkpoints')
-        os.makedirs(epoch_path)
-        shutil.copytree(checkpoint_path, check_epoch_path)
+        os.makedirs(epoch_path, exist_ok=True)
+        shutil.copytree(checkpoint_path, check_epoch_path, dirs_exist_ok=True)
 
         num_samples = 10000
 
         # Setup HDF5 file.
         hdf5_path = os.path.join(epoch_path, 'hdf5_epoch_%s_projected_images.h5' % epoch)
         hdf5_file = h5py.File(hdf5_path, mode='w')
-        img_storage  = hdf5_file.create_dataset(name='images',           shape=[num_samples, data.patch_h, data.patch_w, data.n_channels], dtype=np.float32)
+        img_storage  = hdf5_file.create_dataset(name='images',           shape=[num_samples, data.n_channels, data.patch_h, data.patch_w], dtype=np.float32)
         conv_storage = hdf5_file.create_dataset(name='conv_features',    shape=[num_samples] + list(self.conv_space_t1.shape[1:]),     dtype=np.float32) # set these
         h_storage    = hdf5_file.create_dataset(name='h_representation', shape=[num_samples] + list(self.h_rep_t1.shape[1:]),          dtype=np.float32)
         z_storage    = hdf5_file.create_dataset(name='z_representation', shape=[num_samples] + list(self.z_rep_t1.shape[1:]),          dtype=np.float32)
@@ -192,9 +191,16 @@ class BarlowTwinsTraining():
         while ind<num_samples:
             images_batch = data.training.images[self.selected_indx[ind: ind+batch_size], :, :, :]
             real_images_1_t1, _ = self.data_loading(images_batch, device)
+            
 
             # Model forward pass
             conv_space_out, h_rep_out, z_rep_out = model.forward(real_images_1_t1, True)
+            conv_space_out = conv_space_out.detach().to("cpu")
+            h_rep_out = h_rep_out.detach().to("cpu")
+            z_rep_out = z_rep_out.detach().to("cpu")
+
+            real_images_1_t1 = real_images_1_t1.detach().to("cpu")
+            images_batch = images_batch.transpose(0, 3, 1, 2)
 
             img_storage[ind: ind+batch_size, :, : ,:]  = images_batch
             conv_storage[ind: ind+batch_size, :] = conv_space_out.detach()
@@ -210,7 +216,7 @@ class BarlowTwinsTraining():
         except Exception as ex:
             print('Issue printing latent space images. Epoch', epoch)
             if hasattr(ex, 'message'):
-                print('\t\tException', ex.message)
+                print(f"\t\tException: {str(ex)}")
             else:
                 print('\t\tException', ex)
         finally:
@@ -220,13 +226,13 @@ class BarlowTwinsTraining():
     # Training function.
     def training_func(self, epochs, data_out_path, data, restore, print_epochs=10, n_images=25, checkpoint_every=None, report=False): # uses data
         if self.wandb_flag:
-            wandb.login()
+            wandb.login(key="c13906296738f8d607f36930faa0617abbc65dc9")
             train_config = save_model_config(self, data)
             run_name = self.model_name + '-' + data.dataset
             wandb.init(project='HPL', name=run_name, config=train_config)
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(device)
+        device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
         # Set GPU memory management similar to TensorFlow
         torch.backends.cudnn.benchmark = True  # Optimizes performance for fixed input sizes
         torch.backends.cudnn.enabled = True # Enables cuDNN acceleration (if available)
@@ -238,16 +244,16 @@ class BarlowTwinsTraining():
                                                      spectral=self.spectral, layers=self.layers, attention=self.attention, power_iterations=self.power_iterations,
                                                      init=self.init, regularizer_scale=self.regularizer_scale, model_name=self.model_name)
         model_params = list(model.parameters())
-        model.to(device)
+        model = model.to(device)
 
         run_epochs = 0
         torch.save(model, 'model_weights.pth')
 
 
         try:
-            checkpoints, csvs = setup_output(data_out_path=data_out_path, model_name=self.model_name, restore=restore)
+            # checkpoints, csvs = setup_output(data_out_path=data_out_path, model_name=self.model_name, restore=restore)
             losses = ['Redundancy Reduction Loss Train', 'Redundancy Reduction Loss Validation']
-            setup_csvs(csvs=csvs, model=self, losses=losses)
+            # setup_csvs(csvs=csvs, model=self, losses=losses)
             report_parameters(self, epochs, restore, data_out_path)
 
             # Define optimizer and loss
@@ -270,31 +276,31 @@ class BarlowTwinsTraining():
                 print('Restored model: %s' % check)
 
 
-            train_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=False)
+            train_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=True)
 
             i = 0
 
             # Epoch Iteration.
             for epoch in range(0, epochs+1):
                 if self.wandb_flag:
-                    wandb.log({'Epoch': epoch})
+                    wandb.log({'Epoch': epoch+1})
                 # Batch Iteration.
                 for batch_images, batch_labels in train_dataloader:
                     # set it to training mode
                     model.train()
                     ################################# TRAINING ENCODER #################################################
                     # Update discriminator.
-                    images_1, images_2 = self.data_loading(batch_images, device)
+                    real_images_1, real_images_2= self.data_loading(batch_images, device)
                     # show first transformation of images
                     if epoch == 0:
                         if i == 0:
                             # transform the images # todo: put in if in first loop
-                            real_images_1_t1 = images_1.permute(0, 2, 3, 1)
-                            real_images_1_t2 = images_2.permute(0, 2, 3, 1)
+                            real_images_1_t = real_images_1.permute(0, 2, 3, 1)
+                            real_images_2_t = real_images_2.permute(0, 2, 3, 1)
                             write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_1.png'),
-                                               data=real_images_1_t1, metadata=False)
+                                               data=real_images_1_t, metadata=False)
                             write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_2.png'),
-                                               data=real_images_1_t2, metadata=False)
+                                               data=real_images_2_t, metadata=False)
 
                             if self.wandb_flag:  # todo: fix me
                                 dict_ = {"transformed_1": wandb.Image(
@@ -302,12 +308,14 @@ class BarlowTwinsTraining():
                                          "transformed_2": wandb.Image(
                                              os.path.join(data_out_path, 'images/transformed_2.png'))}
                                 wandb.log(dict_)
-                        i+=1
+                            i+=1
+                    
+                    # Encoder Training
+                    conv_space_t1, self.h_rep_t1, self.z_rep_t1 = model.forward(real_images_1, True)
+                    conv_space_t2, h_rep_t2, z_rep_t2 = model.forward(real_images_2, True)
+                    # Encoder Representations Inference.
 
-                    # Model forward pass
-                    self.conv_space_t1, self.h_rep_t1, self.z_rep_t1 = model.forward(images_1, True)
-                    conv_space_t2, h_rep_t2, z_rep_t2 = model.forward(images_2, True)
-
+                    
                     ################### LOSS & OPTIMIZER ###############################################################
                     # Losses.
                     # Compute loss
@@ -320,12 +328,12 @@ class BarlowTwinsTraining():
                     lr_decayed_fn.step()
                     ####################################################################################################
                     # Print losses and Generate samples.
-                    # model.eval() # set in validation mode
+                    model.eval() # set in validation mode
                     if run_epochs % print_epochs == 0:
                         epoch_outputs = loss_contrastive.item()
 
                         with torch.no_grad():
-                            val_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=False)
+                            val_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=4, pin_memory=True)
 
                             for batch_images, batch_labels in val_dataloader: # todo: unsure if validation is corrrect
                                     eval_images_1, eval_images_2 = self.data_loading(batch_images, device)
@@ -338,7 +346,7 @@ class BarlowTwinsTraining():
 
                                     val_outputs = loss_contrastive
 
-                                    update_csv(model=self, file=csvs[0], variables=[epoch_outputs, val_outputs], epoch=epoch, iteration=run_epochs, losses=losses)
+                                    # update_csv(model=self, file=csvs[0], variables=[epoch_outputs, val_outputs], epoch=epoch, iteration=run_epochs, losses=losses)
                                     if self.wandb_flag: wandb.log({'Redundancy Reduction Loss Train': epoch_outputs, 'Redundancy Reduction Loss Validation': val_outputs})
                                     break
                 # Save model.
@@ -349,7 +357,6 @@ class BarlowTwinsTraining():
                 # Save checkpoint and generate images for FID every X epochs.
                 if (checkpoint_every is not None and epoch % checkpoint_every == 0) or (epochs==epoch):
                     self.project_subsample(device=device, model=model, data=data, epoch=epoch, data_out_path=data_out_path, report=report)
-
 
 
         except RuntimeError as e:

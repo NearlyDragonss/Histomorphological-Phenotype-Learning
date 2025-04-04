@@ -12,11 +12,11 @@ def noise_input(inputs, scope, model=None):
 
     # Scale per channel as mentioned in the paper.
     if len(inputs.shape) == 2:
-        noise_shape = [torch.Tensor.size(inputs)[0], inputs.shape[1]]
+        noise_shape = [inputs.shape[0], inputs.shape[1]]
     else:
-        noise_shape = [torch.Tensor.size(inputs)[0], 1, 1, inputs.shape[3]]
-    noise = torch.normal(mean=0.0, std=1.0, size=noise_shape)
-    t = torch.empty(inputs.shape[-1])
+        noise_shape = [inputs.shape[0], 1, 1, inputs.shape[3]]
+    noise = torch.normal(mean=0.0, std=1.0, size=noise_shape).cuda()
+    t = torch.empty(inputs.shape[-1]).cuda()
     weights = torch.nn.init.xavier_uniform_(tensor=t)
     outputs = inputs + torch.mul(weights, noise)
     if model != None:
@@ -110,7 +110,7 @@ def attention_block_2(model, x, scope, spectral=True, init='xavier', regularizer
     batch_size, channels, height, width = x.shape
 
     # Global value for all pixels, measures how important is the context for each of them.
-    t = torch.empty((1))
+    t = torch.empty((1)).cuda()
     gamma = torch.nn.init.constant_(t, 0.0)
     model.set_gamma(gamma)
     f_g_channels = channels//8
@@ -166,7 +166,7 @@ def spectral_normalization(filter, power_iterations): # todo: might need to chan
 
     u_shape = (1, filter_shape[-1])
     # If I put trainable = False, I don't need to use tf.stop_gradient()
-    t = torch.empty(u_shape)
+    t = torch.empty(u_shape).cuda()
     u = torch.nn.init.trunc_normal_(t)
     # u_norm, singular_w = power_iteration_method(filter_reshape, u, power_iterations)
 
@@ -222,15 +222,16 @@ def convolutional(model, inputs, output_channels, filter_size, stride, padding, 
     # Shape of the weights
     current_shape = inputs.shape
     input_channels = current_shape[1]
+    inputs = inputs.float()
 
     if 'transpose'in conv_type or 'upscale' in conv_type: weight_shape = (input_channels, output_channels, filter_size, filter_size) # fix this for transpose
     else: weight_shape = (output_channels, input_channels, filter_size, filter_size)
 
     # Weight and Bias Initialization.
-    bias = torch.full(size=(output_channels,), fill_value=0.0)
+    bias = torch.full(size=(output_channels,), fill_value=0.0).cuda()
     model.set_bias(bias)
 
-    weight = torch.randn(weight_shape) * 0.01
+    weight = torch.randn(weight_shape).cuda() * 0.01
 
     # Weight Initializer
     if init=='normal':
@@ -243,7 +244,7 @@ def convolutional(model, inputs, output_channels, filter_size, stride, padding, 
         weight = torch.nn.init.xavier_normal_(weight)
 
 
-    # Type of convolutional operation.
+    # Type of convolutional operation.ssh lucky-duck-96.ida
     if conv_type == 'upscale':
         output_shape = [tf.shape(inputs)[0], current_shape[1]*2, current_shape[2]*2, output_channels]
         # Weight filter initializer.
@@ -295,7 +296,7 @@ def convolutional(model, inputs, output_channels, filter_size, stride, padding, 
             output = torch.nn.functional.conv2d(input=inputs, weight=weight, stride=stride, padding=padding_torch)
 
     elif conv_type == 'transpose':
-        output_shape = [torch.Tensor.size(inputs)[0], current_shape[1]*stride, current_shape[2]*stride, output_channels]
+        output_shape = [inputs.shape[0], current_shape[1]*stride, current_shape[2]*stride, output_channels]
         strides = (stride, stride)
         if spectral: weight = spectral_normalization(weight, power_iterations)
 
@@ -343,7 +344,7 @@ def convolutional(model, inputs, output_channels, filter_size, stride, padding, 
 
 def dense(model, inputs, out_dim, scope, use_bias=True, spectral=False, power_iterations=1, init='xavier', regularizer=None, display=True):
     in_dim = inputs.shape[1]
-    t = torch.empty((in_dim, out_dim))
+    t = torch.empty((in_dim, out_dim)).cuda()
 
     if init=='normal':
         weights = torch.nn.init.normal_(t, std=0.02)
@@ -360,7 +361,7 @@ def dense(model, inputs, out_dim, scope, use_bias=True, spectral=False, power_it
         output = torch.matmul(inputs, weights)
 
     if use_bias :
-        bias = torch.full((out_dim,), 0.0)
+        bias = torch.full((out_dim,), 0.0).cuda()
         output = torch.add(output, bias)
         model.set_bias(bias)
 

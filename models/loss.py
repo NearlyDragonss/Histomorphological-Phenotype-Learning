@@ -318,39 +318,30 @@ def byol_loss(prediction, z_rep):
 
 def cross_correlation_loss(z_a, z_b, lambda_):
     def normalize_repr(z):
-        z_norm = (z - torch.mean(z, axis=0)) / torch.std(z, dim=0)
+        z_norm = (z - torch.mean(z, dim=0)) / torch.std(z, dim=0) # maybe change to axis
         return z_norm
 
     def off_diagonal(x):
-        n = torch.Tensor.size(x)[0]
+        n = x.shape[0]
         flattened = torch.reshape(x, [-1])[:-1]
         off_diagonals = torch.reshape(flattened, (n-1, n+1))[:, 1:]
         return torch.reshape(off_diagonals, [-1])
-
-    batch_size = torch.tensor(int(z_a.shape[0]))
-    repr_dim = torch.Tensor.size(z_a)[1]
+    batch_size = batch_size = z_a.shape[0]
+    repr_dim = z_a.shape[1] 
 
     # Batch normalize representations
     z_a_norm = normalize_repr(z_a)
     z_b_norm = normalize_repr(z_b)
 
-
-    z_a_norm = z_a_norm.squeeze()
-    z_b_norm = z_b_norm.squeeze()
-
-    a = z_a_norm.T
-    b = z_b_norm
+    # z_a_norm = z_a_norm.squeeze()
+    # z_b_norm = z_b_norm.squeeze()
 
     # Cross-correlation matrix.
-    c = torch.matmul(a, b) / batch_size
+    c = torch.matmul(z_a_norm.T, z_b_norm) / batch_size
 
     inv_term    = torch.diag(c,0) # todo: check this is correct # https://stackoverflow.com/questions/70381758/equivalent-of-tf-linalg-diag-part-in-pytorch
     on_diag     = torch.sum(torch.pow(1-inv_term, 2))
-
-    a = torch.ones_like(c)
-    b = torch.eye(repr_dim)
-    redred_term = (a-b)
-    redred_term = redred_term*c
+    redred_term = (torch.ones_like(c).cuda()-torch.eye(repr_dim).cuda())*c
     off_diag    = torch.sum(torch.pow(redred_term, 2))
 
     loss = on_diag + (lambda_ * off_diag)

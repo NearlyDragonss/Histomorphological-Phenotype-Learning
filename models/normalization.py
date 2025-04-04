@@ -9,9 +9,9 @@ def batch_norm(inputs, training, c=None, spectral=False, scope=False):
 	input_dim = torch.Tensor.dim(inputs)
 	channels = inputs.shape[1]
 	if input_dim == 2 or input_dim == 3:
-		batch = nn.BatchNorm1d(channels)
+		batch = nn.BatchNorm1d(channels).cuda()
 	elif input_dim == 4:
-		batch = nn.BatchNorm2d(channels)
+		batch = nn.BatchNorm2d(channels).cuda()
 	output = batch(inputs)
 	return output
 
