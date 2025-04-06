@@ -90,7 +90,7 @@ class BarlowTwinsTraining():
 
         self.lambda_ = lambda_
 
-        self.num_samples = data.training.images.shape[0]
+        self.num_samples = data.training.size
         all_indx = list(range(self.num_samples))
         random.shuffle(all_indx)
         self.selected_indx = np.array(sorted(all_indx[:10000]))
@@ -276,7 +276,7 @@ class BarlowTwinsTraining():
                 print('Restored model: %s' % check)
 
 
-            train_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=0, pin_memory=True)
+            train_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=0, multiprocessing_context='forkserver', pin_memory=True)
 
             i = 0
 
@@ -333,7 +333,7 @@ class BarlowTwinsTraining():
                         epoch_outputs = loss_contrastive.item()
 
                         with torch.no_grad():
-                            val_dataloader = DataLoader(data.validation, batch_size=self.batch_size, shuffle=False, num_workers=0, pin_memory=True)
+                            val_dataloader = DataLoader(data.validation, batch_size=self.batch_size, shuffle=False, num_workers=0, multiprocessing_context='forkserver', pin_memory=True)
 
                             for batch_images, batch_labels in val_dataloader: # todo: unsure if validation is corrrect
                                     eval_images_1, eval_images_2 = self.data_loading(batch_images, device)

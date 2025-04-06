@@ -17,8 +17,6 @@ class DatasetPyTorch(Dataset):
         self.patch_h = patch_h
         self.patch_w = patch_w
         self.n_channels = n_channels
-        # print(h5py.File(hdf5_path, 'r').keys())
-        # self.dataset = h5py.File(hdf5_path, 'r') # for use in loading data from https://discuss.pytorch.org/t/dataloader-when-num-worker-0-there-is-bug/25643/16
 
         # Options for conditional PathologyGAN
         self.num_clusters = num_clusters
@@ -31,94 +29,43 @@ class DatasetPyTorch(Dataset):
             self.labels_flag = True
 
         self.hdf5_path = hdf5_path
-        # Get images and labels
-        self.images = list()
-        self.labels = list()
-        if not empty:
-            self.images, self.labels, self.embedding = self.get_hdf5_data()
-        self.size = len(self.images)
-        self.iterations = len(self.images)//self.batch_size + 1
-
-    @property
-    def shape(self):
-        return [len(self.images), self.patch_h, self.patch_w, self.n_channels]
-
-    def get_hdf5_data(self):
-        hdf5_file = h5py.File(self.hdf5_path, 'r')
-
-        # Legacy code for initial naming of images, label keys.
-        labels_name = self.labels_name
-        naming = list(hdf5_file.keys())
-        if 'images' in naming:
-            image_name = 'images'
-            if labels_name is None:
-                labels_name = 'labels'       
+        self.hdf5_file = None
+        if empty:
+            self.image_key = None
+            self.labels_key = None
+            self.size = 0
         else:
-            for naming in list(hdf5_file.keys()):     
-                if 'img' in naming or 'image' in naming:
-                    image_name = naming
-                elif 'labels' in naming and self.labels_name is None:
-                    labels_name = naming
+            self.image_key, self.labels_key, self.size = self.get_hdf5_keys()
+    
+    def _lazy_init(self):
+        if self.hdf5_file is None:
+            self.hdf5_file = h5py.File(self.hdf5_path, 'r')
 
-        # Get images, labels, and embeddings if neccesary.
-        images    = hdf5_file[image_name]
-        embedding = None
-        labels    = np.zeros((images.shape[0]))
-        if self.labels_flag:
-            if self.labels_name == 'inception' or self.labels_name == 'self':
-                labels, embedding = inception_feature_labels(self.hdf5_path, image_name, self.patch_h, self.patch_w, self.n_channels, self.num_clusters, self.clust_percent, set_type=self.labels_name)
-                labels, embedding = inception_feature_labels(self.hdf5_path, image_name, self.patch_h, self.patch_w, self.n_channels, self.num_clusters, self.clust_percent, set_type=self.labels_name)
+
+    def get_hdf5_keys(self):
+        with h5py.File(self.hdf5_path, 'r') as hdf5_file:
+            labels_name = self.labels_name
+            naming = list(hdf5_file.keys())
+            if 'images' in naming:
+                image_name = 'images'
+                if labels_name is None:
+                    labels_name = 'labels'       
             else:
-                labels = hdf5_file[labels_name]
-        return images, labels, embedding
+                for naming in list(hdf5_file.keys()):     
+                    if 'img' in naming or 'image' in naming:
+                        image_name = naming
+                    elif 'labels' in naming and self.labels_name is None:
+                        labels_name = naming
+            size = hdf5_file[image_name].shape[0]
+        return image_name, labels_name, size
 
-    def set_pos(self, i):
-        self.i = i
-
-    def get_pos(self):
-        return self.i
-
-    def reset(self):
-        self.set_pos(0)
-
-    def set_batch_size(self, batch_size):
-        self.batch_size = batch_size
-
-    def set_thresholds(self, thresholds):
-        self.thresholds = thresholds
-
-    def adapt_label(self, label):
-        thresholds = self.thresholds + (None,)
-        adapted = [0.0 for _ in range(len(thresholds))]
-        i = None
-        for i, threshold in enumerate(thresholds):
-            if threshold is None or label < threshold:
-                break
-        adapted[i] = label if len(adapted) == 1 else 1.0
-        return adapted
-
-    # def next_batch(self, n):
-    #     if self.done:
-    #         self.done = False
-    #         raise StopIteration
-    #     batch_img = self.images[self.i:self.i + n]
-    #     batch_labels = self.labels[self.i:self.i + n]
-    #     self.i += len(batch_img)
-    #     delta = n - len(batch_img)
-    #     if delta == n:
-    #         raise StopIteration
-    #     if 0 < delta:
-    #         batch_img = np.concatenate((batch_img, self.images[:delta]), axis=0)
-    #         batch_labels = np.concatenate((batch_labels, self.labels[:delta]), axis=0)
-    #         self.i = delta
-    #         self.done = True
-    #     return batch_img/255.0, batch_labels
 
     def __len__(self):
 
         return self.size # check is right
 
     def __getitem__(self, idx):
-        batch_images = self.images[idx] /255.0
-        batch_labels = self.labels[idx]
+        self._lazy_init()
+        batch_images = self.hdf5_file[self.image_key][idx] / 255.0
+        batch_labels = self.hdf5_file[self.labels_key][idx]
         return batch_images, batch_labels
