@@ -45,7 +45,7 @@
 In this repository you will find the following sections: 
 1. [WSI tiling process](#WSI-tiling-process): Instructions on how to create H5 files from WSI tiles.
 2. [Workspace setup](#Workspace-setup): Details on H5 file content and directory structure.
-3. [HPL instructions](./README_HPL.md): Step-by-step instructions on how to run the complete methodology.
+3. [HPL instructions](README_HPL.md): Step-by-step instructions on how to run the complete methodology.
    1. Self-supervised Barlow Twins training.
    2. Tile vector representations.
    3. Combination of all sets into one H5.
@@ -150,7 +150,7 @@ You can edit the code by running `marimo edit tile_visualizer_umap.py`. Run the 
 
 ## Frequently Asked Questions
 #### I want to reproduce the paper results.
-You can find TCGA files, results, and commands to reproduce them on this [Readme_replication file](./README_replication.md). For any questions regarding the  New York University cohorts, please address reasonable requests to the corresponding authors.
+You can find TCGA files, results, and commands to reproduce them on this [Readme_replication file](README_replication.md). For any questions regarding the  New York University cohorts, please address reasonable requests to the corresponding authors.
 
 #### I have my own cohort and I want to assign existing HPCs to my own WSI.
 You can follow steps on how to assign existing HPCs in this [Readme_additional_cohort file](README_additional_cohort.md). These instructions will guide you through assigning LUAD and Multi-cancer HPCs reported in the publication to your own cohort.
@@ -214,7 +214,7 @@ You can find WSI and patient vector representations used in the publication resu
 3. [Multi-cancer (BLCA, BRCA, CESC, COAD, LUSC, LUAD, PRAD, SKCM, STAD, UCEC)](https://drive.google.com/file/d/1f9y4dtFfIMe9QsrKZnlk2BPfOt9zI73x/view?usp=share_link)
 
 ## Python Environment
-The code uses Python 3.8 and the necessary packages can be found at [requirements.txt](./requirements.txt)
+The code uses Python 3.8 and the necessary packages can be found at [requirements.txt](../requirements.txt)
 
 The flow uses TensorFlow 1.15 and according to [TensorFlows Specs](https://www.tensorflow.org/install/source#gpu) the closest CUDA and cuDNN version are `cudatoolkits==10.0` and `cudnn=7.6.0`. 
 However, depending on your GPU card you might need to use `cudatoolkits==11.7` and `cudnn=8.0` instead. 
@@ -238,7 +238,7 @@ These are the dockers with the environments to run the steps of HPL. Step **'Lei
 
 If you want to run the docker image in your local machine. These commands should get you up and running.
 Please take into account that the image [aclaudioquiros/tf_package:v16](https://hub.docker.com/r/aclaudioquiros/tf_package/tags) uses CUDA 10.0, if your GPU card uses the Ampere architecture (Nvidia 30s or A100s) it won't work appropriately.   
-In addition, if you want to run the [Step 6 - Leiden clustering in HPL](./README_HPL.md), you would need to change the image name:
+In addition, if you want to run the [Step 6 - Leiden clustering in HPL](README_HPL.md), you would need to change the image name:
 
 ```
 docker run -it --mount src=`pwd`,target=/tmp/Workspace,type=bind aclaudioquiros/tf_package:v16

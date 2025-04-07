@@ -1,18 +1,18 @@
 # HPL Instructions - Mapping an external cohort to existing HPCs.
 
-In these intructions, we provide detailed steps to map tissue tiles from an external set of WSIs to extisting HPCs. We use the files corresponding to the LUAD HPCs results in the paper. In case you want to map tissue tiles to the Multi-cancer HPCs, execute until step 6 included, once background/artifact have been removed from your cohort's H5 file. You can continue with the reamining steps using the multi-cancer files provided in this section of the [Readme file](./README.md#TCGA-HPL-files).
+In these intructions, we provide detailed steps to map tissue tiles from an external set of WSIs to extisting HPCs. We use the files corresponding to the LUAD HPCs results in the paper. In case you want to map tissue tiles to the Multi-cancer HPCs, execute until step 6 included, once background/artifact have been removed from your cohort's H5 file. You can continue with the reamining steps using the multi-cancer files provided in this section of the [Readme file](README.md#TCGA-HPL-files).
 
 ## 1. WSI tiling process
-Use the [WSI tiling process](./README.md#WSI-tiling-process) to obtain tile images from the original WSIs.
+Use the [WSI tiling process](README.md#WSI-tiling-process) to obtain tile images from the original WSIs.
 
 ## 2. Download TCGA tile images
-Download and setup both datasets TCGA LUAD & LUSC WSI tile images [here](./README.md#TCGA-HPL-files)
+Download and setup both datasets TCGA LUAD & LUSC WSI tile images [here](README.md#TCGA-HPL-files)
 
 ## 3. Tile vector representations
-Use [step 2 of HPL methodology](./README_HPL.md) to find tile vector representations for each tile image.
+Use [step 2 of HPL methodology](README_HPL.md) to find tile vector representations for each tile image.
 
 ## 4. Include metadata in your H5 file
-Include metadata in the H5 file of your cohort by running [step 5 of HPL methodology](./README_HPL.md).
+Include metadata in the H5 file of your cohort by running [step 5 of HPL methodology](README_HPL.md).
 
 ## 5. Background and artifact removal
 1. Download the cluster configurations for removal of background and artifact tiles:
@@ -32,7 +32,7 @@ python3 ./run_representationsleiden_assignment.py \
 - [**Note**] You will see warnings for folds 0-3, that's fine: [Warning] H5AD file not found at '.h5ad' or '_subsample.h5ad'.
 - At the end of this step you should see a csv file with your cohort tile cluster assignations. E.g.: `results/BarlowTwins_3/TCGAFFPE_LUADLUSC_5x_60pc_250K/h224_w224_n3_zdim128/removal/adatas/NYUFFPE_LUADLUSC_5x_60pc_he_combined_leiden_5p0__fold4.csv`
 
-4. Execute [steps 7.2 and 7.3 of the HPL instructions](./README_HPL.md):
+4. Execute [steps 7.2 and 7.3 of the HPL instructions](README_HPL.md):
    - The cluster ids used to remove this tiles can be found in the [notebook](https://github.com/AdalbertoCq/Histomorphological-Phenotype-Learning/blob/master/utilities/tile_cleaning/review_cluster_external_dataset.ipynb)
    - `clusters_to_remove = [104, 102, 99, 90, 86, 83, 73, 58, 97, 89, 21]`
    - At the end of these steps you should have a file without tile representations that belong to the background/artifact clusters. E.g.: `results/BarlowTwins_3/TCGAFFPE_LUADLUSC_5x_60pc/h224_w224_n3_zdim128/hdf5_this_is_your_external_cohort_filtered.h5`
@@ -40,7 +40,7 @@ python3 ./run_representationsleiden_assignment.py \
 ## 6. Setup directory with filtered representations
 1. Create the directory `results/BarlowTwins_3/TCGAFFPE_LUADLUSC_5x_60pc_250K/h224_w224_n3_zdim128_filtered`
 2. Copy over the resulting H5 from the previous step `results/BarlowTwins_3/TCGAFFPE_LUADLUSC_5x_60pc/h224_w224_n3_zdim128/hdf5_this_is_your_external_cohort_filtered.h5`
-3. Download and copy over the [TCGA LUAD & LUSC tile vector representations](./README.md#TCGA-HPL-files). E.g.: `results/BarlowTwins_3/TCGAFFPE_LUADLUSC_5x_60pc/h224_w224_n3_zdim128/hdf5_TCGAFFPE_LUADLUSC_5x_60pc_he_complete_lungsubtype_survival_filtered.h5`
+3. Download and copy over the [TCGA LUAD & LUSC tile vector representations](README.md#TCGA-HPL-files). E.g.: `results/BarlowTwins_3/TCGAFFPE_LUADLUSC_5x_60pc/h224_w224_n3_zdim128/hdf5_TCGAFFPE_LUADLUSC_5x_60pc_he_complete_lungsubtype_survival_filtered.h5`
 4. Create directories for lung type classification task and LUAD overall survival:
    1. LUAD vs LUSC type classification: `results/BarlowTwins_3/TCGAFFPE_LUADLUSC_5x_60pc_250K/h224_w224_n3_zdim128_filtered/lung_subtypes_nn250`
    2. LUAD Survival: `results/BarlowTwins_3/TCGAFFPE_LUADLUSC_5x_60pc_250K/h224_w224_n3_zdim128_filtered/luad_overall_survival_nn250`
@@ -77,7 +77,7 @@ python3 ./run_representationsleiden_assignment.py \
 Now you should be able to run lung classification, survival analysis, or cluster correlations for your external cohort.
 
 ## 8. Logistic regression for classification
-You can find full details on this step at the [HPL instruction readme](./README_HPL.md).
+You can find full details on this step at the [HPL instruction readme](README_HPL.md).
 
 This is an example of the command to the logistic regression for your cohort. Make sure you modify line 46 in `report_representationsleiden_lr.py` to only run `resolutions=[2.0]`
 ```
@@ -93,7 +93,7 @@ python3 ./report_representationsleiden_lr.py \
 ```
 
 ## 9. Cox proportional hazards for survival regression - Individual resolution and penalty
-You can find full details on this step at the [HPL instruction readme](./README_HPL.md).
+You can find full details on this step at the [HPL instruction readme](README_HPL.md).
 
 This is an example of the command to the Cox proportional hazards for survival regression.
 ```
