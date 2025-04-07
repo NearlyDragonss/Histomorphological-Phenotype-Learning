@@ -2,7 +2,7 @@ from models.ops import *
 import tensorflow as tf
 from torch import nn
 
-display = False #todo change back
+display = False
 
 class EncoderResnetContrastive(torch.nn.Module):
 	def __init__(self, model_name, z_dim, h_dim, layers, spectral, activation, init='xavier',
@@ -20,6 +20,7 @@ class EncoderResnetContrastive(torch.nn.Module):
 		self.attention = attention
 		self.down = down
 		self.name = name
+
 
 	def forward(self, model, images, is_train):
 		if '_0' in self.model_name:
@@ -168,7 +169,6 @@ class EncoderResnetContrastive(torch.nn.Module):
 			print('Attention:  ', self.attention)
 			print()
 
-
 		for layer in range(self.layers):
 			# ResBlock.
 			net = residual_block(model=model, inputs=images, filter_size=5, stride=1, padding='SAME', scope='%sa' % layer,
@@ -193,7 +193,7 @@ class EncoderResnetContrastive(torch.nn.Module):
 		# Feature space extraction
 		max_pool = nn.MaxPool2d(pool_size=2, stride=2)
 		conv_space = max_pool(net)
-		flatten = nn.Flatten() # todo: check is correct
+		flatten = nn.Flatten()
 		conv_space = flatten(conv_space)
 
 		# Flatten.
@@ -218,7 +218,6 @@ class EncoderResnetContrastive(torch.nn.Module):
 
 
 	def encoder_resnet_contrastive_3(self, model, images, is_train):
-
 		channels = [32, 64, 128, 256, 512, 1024]
 		if display:
 			print('CONTRASTIVE ENCODER INFORMATION:')
@@ -227,6 +226,7 @@ class EncoderResnetContrastive(torch.nn.Module):
 			print('Activation: ', self.activation)
 			print('Attention:  ', self.attention)
 			print()
+
 		net = convolutional(model=model, inputs=images, output_channels=32, filter_size=7, stride=2, padding='SAME',
 							conv_type='convolutional', spectral=self.spectral, init=self.init,
 							regularizer=self.regularizer, scope='intital_layer', display=True)
@@ -255,7 +255,7 @@ class EncoderResnetContrastive(torch.nn.Module):
 		# Feature space extraction
 		max_pool = nn.MaxPool2d(kernel_size=2, stride=2)
 		conv_space = max_pool(net)
-		flatten = nn.Flatten() # todo: check is correct
+		flatten = nn.Flatten()
 		conv_space = flatten(conv_space)
 
 		# Flatten.
@@ -316,7 +316,7 @@ class EncoderResnetContrastive(torch.nn.Module):
 		# Feature space extraction
 		max_pool = nn.MaxPool2d(pool_size=2, stride=2)
 		conv_space = max_pool(net)
-		flatten = nn.Flatten() # todo: check is correct
+		flatten = nn.Flatten()
 		conv_space = flatten(conv_space)
 
 		# Flatten.
@@ -343,7 +343,6 @@ class EncoderResnetContrastive(torch.nn.Module):
 
 
 	def encoder_resnet_contrastive_5(self, model, images, is_train):
-
 		channels = [32, 64, 128, 256, 512, 1024]
 		if display:
 			print('CONTRASTIVE ENCODER INFORMATION:')
@@ -384,7 +383,7 @@ class EncoderResnetContrastive(torch.nn.Module):
 		# Feature space extraction
 		max_pool = nn.MaxPool2d(pool_size=2, stride=2)
 		conv_space = max_pool(net)
-		flatten = nn.Flatten() # todo: check is correct
+		flatten = nn.Flatten()
 		conv_space = flatten(conv_space)
 
 		# Flatten.
@@ -441,7 +440,7 @@ class EncoderResnetContrastive(torch.nn.Module):
 		# Feature space extraction
 		max_pool = nn.MaxPool2d(pool_size=2, stride=2)
 		conv_space = max_pool(net)
-		flatten = nn.Flatten() # todo: check is correct
+		flatten = nn.Flatten()
 		conv_space = flatten(conv_space)
 
 		# Flatten.
@@ -465,7 +464,6 @@ class EncoderResnetContrastive(torch.nn.Module):
 
 		print()
 		return conv_space, h, z
-
 
 
 	def encoder_resnet_contrastive_7(self, model, images, is_train):
@@ -506,9 +504,8 @@ class EncoderResnetContrastive(torch.nn.Module):
 		# Feature space extraction
 		max_pool = nn.MaxPool2d(pool_size=2, stride=2)
 		conv_space = max_pool(net)
-		flatten = nn.Flatten() # todo: check is correct
+		flatten = nn.Flatten()
 		conv_space = flatten(conv_space)
-
 
 		# Flatten.
 		flatten = nn.Flatten()
@@ -534,7 +531,6 @@ class EncoderResnetContrastive(torch.nn.Module):
 
 		print()
 		return h, z, representation
-
 
 
 def encoder_resnet_contrastive_SimSiam(images, z_dim, h_dim, layers, spectral, activation, is_train, reuse, init='xavier', regularizer=None, normalization=None, attention=None, down='downscale', name='contrastive_encoder'):

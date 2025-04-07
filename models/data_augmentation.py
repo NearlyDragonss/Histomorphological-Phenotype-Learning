@@ -49,9 +49,9 @@ def random_brightness(image, max_delta, impl='simclrv2'):
         raise ValueError('Unknown impl {} for random brightness.'.format(impl))
     return image
 
+
 # Random color transformations: Bright, Contrast, Saturation, and Hue.
 def color_jitter_rand(image, brightness=0, contrast=0, saturation=0, hue=0, impl='simclrv2'):
-    # with tf.name_scope('distort_color'): # todo:
     def apply_transform(i, x):
         def brightness_foo():
             if brightness == 0:
@@ -85,15 +85,15 @@ def color_jitter_rand(image, brightness=0, contrast=0, saturation=0, hue=0, impl
                 x = hue_foo()
         return x
 
-    perm = torch.randperm(4) # todo: check this # https://stackoverflow.com/questions/44738273/torch-how-to-shuffle-a-tensor-by-its-rows
+    perm = torch.randperm(4) # from https://stackoverflow.com/questions/44738273/torch-how-to-shuffle-a-tensor-by-its-rows
     for i in range(4):
         image = apply_transform(perm[i], image)
         image = torch.clamp(image, 0.0, 1.0)
     return image
 
+
 # No random color transformations: 1st Bright, 2nd Contrast, 3rd Saturation, and 4th Hue.
 def color_jitter_nonrand(image, brightness=0, contrast=0, saturation=0, hue=0, impl='simclrv2'):
-    # with tf.name_scope('distort_color'): # todo: look at
     def apply_transform(i, x, brightness, contrast, saturation, hue):
         if brightness != 0 and i == 0:
             x = random_brightness(x, max_delta=brightness, impl=impl)
@@ -110,6 +110,7 @@ def color_jitter_nonrand(image, brightness=0, contrast=0, saturation=0, hue=0, i
         image = torch.clamp(image, 0., 1.)
     return image
 
+
 # Color transformation on image: Random or not random order.
 def color_jitter(image, strength, random_order=True, impl='simclrv2'):
     brightness = 0.8 * strength
@@ -123,6 +124,7 @@ def color_jitter(image, strength, random_order=True, impl='simclrv2'):
         image = color_jitter_nonrand(image, brightness, contrast, saturation, hue, impl=impl)
         return image
 
+
 # Image RGB to Grayscale.
 def to_grayscale(image, keep_channels=True):
     if keep_channels:
@@ -133,6 +135,7 @@ def to_grayscale(image, keep_channels=True):
         transform(image)
     return image
 
+
 # Color transformation on image.
 def random_color_jitter(image, p=1.0, impl='simclrv2'):
     def transformation(image):
@@ -140,6 +143,7 @@ def random_color_jitter(image, p=1.0, impl='simclrv2'):
         image = random_apply(color_jitter_t, p=0.8, x=image)
         return random_apply(to_grayscale, p=0.2, x=image)
     return random_apply(transformation, p=p, x=image)
+
 
 # Color transformation on image.
 def random_color_jitter_1p0(image, p=1.0, impl='simclrv2'):
@@ -161,17 +165,11 @@ def distorted_bounding_box_crop(image, bbox, min_object_covered=0.1, aspect_rati
     x_min = bbox_dimentions[1]
     y_max = bbox_dimentions[2]
     x_max = bbox_dimentions[3]
-    # object_region = image[:, y_min:y_max, x_min:x_max]
+
     bbox_height = int(y_max-y_min)
     bbox_width = int(x_max - x_min)
     image_height = image.shape[1]
     image_width = image.shape[2]
-
-    # # Resizes and crops based on bbox parameters
-    # # perm_image = torch.permute(image, (2,0,1))
-    # transformation = torchvision.transforms.RandomResizedCrop(size=(bbox_height, bbox_width), ratio=aspect_ratio_range, scale=(min_object_covered, 1.0))
-    # image = transformation(image)
-    # # image = torch.permute(image, (1,2,0))
 
     for i in range(max_attempts):
         crop_area = random.uniform(area_range[0], area_range[1]) * image_height * image_width
@@ -203,20 +201,18 @@ def distorted_bounding_box_crop(image, bbox, min_object_covered=0.1, aspect_rati
 
     return image
 
+
 # Crop and resize image.
 def crop_and_resize(image, height, width, area_range):
 
     bbox = torch.tensor([[[0.0, 0.0, 1.0, 1.0]]], dtype=torch.float32)
     aspect_ratio = width / height
-    # [224, 224, 3]
+
     image = distorted_bounding_box_crop(image, bbox, min_object_covered=0.1, aspect_ratio_range=(3./4*aspect_ratio, 4./3.*aspect_ratio), area_range=area_range, max_attempts=100, scope=None)
-    # [1,1,3])
-    # image = torch.permute(image, (2,0,1))
+
     image = torch.nn.functional.interpolate(image.unsqueeze(0), size=(height, width), mode="bicubic", align_corners=False)[0]
-    # [1, 224, 224]
+
     return image
-
-
 
 # Random crop and resize.
 def random_crop_and_resize(image, prob=1.0):
@@ -245,6 +241,7 @@ def random_crop_and_resize_global(image, prob=1.0):
         return images
     return random_apply(func=transformation, p=prob, x=image)
 
+
 # Random crop and resize SwAV Local view.
 def random_crop_and_resize_local(image, prob=1.0):
     height, width, channels = image.shape.as_list()
@@ -262,6 +259,7 @@ def random_crop_and_resize_local(image, prob=1.0):
 def random_rotate(image, p=0.5):
     return random_apply(torch.rot90, p, image)
 
+
 def random_flip(image):
     horizontal_flip = v2.RandomHorizontalFlip(p=0.5)
     vertical_flip = v2.RandomVerticalFlip(p=0.5)
@@ -278,6 +276,7 @@ def gaussian_blur(image, kernel_size, sigma, padding='same'):
     transformations = GaussianBlur(kernel_size=kernel_size, sigma=sigma.item())
     blurred = transformations(image)
     return blurred
+
 
 def random_blur(image, p=0.5):
     channels, height, width = list(image.shape)
@@ -297,6 +296,7 @@ def add_gaussian_noise(image):
 
     return noise_img
 
+
 # Adds gaussian noise randomly to image.
 def random_gaussian_noise(image, p=0.5):
     return random_apply(add_gaussian_noise, p, image)
@@ -311,6 +311,7 @@ def random_apply_sobel(func, p, x):
         return b
     else:
         return x
+
 
 def random_sobel_filter(image, p=0.5):
     def sobel_edges(image):
@@ -388,6 +389,7 @@ def get_mean_std_patches(imgs):
 
     return [means_ch_0, means_ch_1, means_ch_2], [stds_ch_0, stds_ch_1, stds_ch_2]
 
+
 def random_renorm(imgs, means, stds):
 
     batch_size, height, width, channels = imgs.shape
@@ -426,10 +428,12 @@ def random_renorm(imgs, means, stds):
 
     return processed_img/255.
 
+
 def random_batch_renormalization(batch_images):
     means, stds  = get_mean_std_patches(imgs=batch_images)
     proc_images  = random_renorm(imgs=batch_images, means=means, stds=stds)
     return proc_images
+
 
 def tf_wrapper_rb_stain(batch_images):
     batch_images = batch_images.permute(0,2,3,1)
@@ -437,6 +441,7 @@ def tf_wrapper_rb_stain(batch_images):
     out_trans = torch.from_numpy(out)
     out_trans = out_trans.permute(0,3,1,2)
     return out_trans
+
 
 def data_augmentation_stain_variability(images, img_size, num_channels):
     images_trans = images
@@ -449,6 +454,7 @@ def data_augmentation_stain_variability(images, img_size, num_channels):
     images_trans = torch.reshape(images_trans, [-1, img_size, img_size, num_channels])
     images_trans = torch.clamp(images_trans, 0., 1.)
     return images_trans
+
 
 def data_augmentation_color(images, img_size, num_channels):
     images_trans = images

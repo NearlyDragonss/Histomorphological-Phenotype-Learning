@@ -89,7 +89,7 @@ elif 'SimSiam' in model:
 elif 'Relational' in model:
 	from models.selfsupervised.RealReas import RepresentationsPathology
 elif 'BarlowTwins' in model:
-	from models.selfsupervised.BarlowTwinsTraining import BarlowTwinsTraining # todo: make better
+	from models.selfsupervised.BarlowTwinsTraining import BarlowTwinsTraining
 elif 'DINO' in model:
 	from models.selfsupervised.DINO import RepresentationsPathology
 

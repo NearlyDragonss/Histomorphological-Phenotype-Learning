@@ -38,13 +38,7 @@ def save_model_config(model, data):
 	model_config['g_noise']       = model.g_noise
 	# Sobel Filter.
 	model_config['sobel_filter']  = model.sobel_filter
-
 	model_config['model_name']    = model.model_name
-
-	# model_config['conv_space_out']    = model.conv_space_out.shape.as_list() # todo: might need to add
-	# model_config['h_rep_out']         = model.h_rep_out.shape.as_list()
-	# model_config['z_rep_out']         = model.z_rep_out.shape.as_list()
-
 	model_config['dataset']       = data.dataset
 
 	return model_config

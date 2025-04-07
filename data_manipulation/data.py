@@ -5,7 +5,6 @@ from data_manipulation.datasetPyTorch import DatasetPyTorch
 
 class Data:
     def __init__(self, dataset, marker, patch_h, patch_w, n_channels, batch_size, project_path=os.getcwd(), thresholds=(), labels=None, empty=False, num_clusters=500, clust_percent=1.0, load=True):
-
         # Directories and file name handling.
         self.dataset = dataset
         self.marker = marker

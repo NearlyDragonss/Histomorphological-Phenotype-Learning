@@ -166,7 +166,6 @@ def losses(loss_type, output_fake, output_real, logits_fake, logits_real, label=
             epsilon = tf.random.uniform(shape=tf.stack([tf.shape(real_images)[0], 1, 1, 1]), minval=0.0, maxval=1.0, dtype=tf.float32, name='epsilon')
             x_gp = real_images*(1-epsilon) + fake_images*epsilon
 
-
             if encoder is None:
                 if label is not None:
                     out = discriminator(x_gp, label_input=label, reuse=True, init=init, name=dis_name)
@@ -241,7 +240,6 @@ def losses(loss_type, output_fake, output_real, logits_fake, logits_real, label=
         tf.reduce_mean(- tf.minimum(0., -1.0 - fake_logits))
         tf.reduce_mean(  tf.maximum(0.,  1.0 + logits_fake))
         '''
-
 
         loss_gen = -tf.reduce_mean(logits_fake)
         loss_print += 'hinge '
@@ -333,13 +331,10 @@ def cross_correlation_loss(z_a, z_b, lambda_):
     z_a_norm = normalize_repr(z_a)
     z_b_norm = normalize_repr(z_b)
 
-    # z_a_norm = z_a_norm.squeeze()
-    # z_b_norm = z_b_norm.squeeze()
-
     # Cross-correlation matrix.
     c = torch.matmul(z_a_norm.T, z_b_norm) / batch_size
 
-    inv_term    = torch.diag(c,0) # todo: check this is correct # https://stackoverflow.com/questions/70381758/equivalent-of-tf-linalg-diag-part-in-pytorch
+    inv_term    = torch.diag(c,0) # from: https://stackoverflow.com/questions/70381758/equivalent-of-tf-linalg-diag-part-in-pytorch
     on_diag     = torch.sum(torch.pow(1-inv_term, 2))
     redred_term = (torch.ones_like(c).cuda()-torch.eye(repr_dim).cuda())*c
     off_diag    = torch.sum(torch.pow(redred_term, 2))

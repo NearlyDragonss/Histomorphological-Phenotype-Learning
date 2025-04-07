@@ -9,7 +9,6 @@ from models.selfsupervised import BarlowTwins
 
 # StyleGAN: Apply a weighted input noise to a layer.
 def noise_input(inputs, scope, model=None):
-
     # Scale per channel as mentioned in the paper.
     if len(inputs.shape) == 2:
         noise_shape = [inputs.shape[0], inputs.shape[1]]
@@ -156,7 +155,7 @@ def attention_block_2(model, x, scope, spectral=True, init='xavier', regularizer
     return y
 
 
-def spectral_normalization(filter, power_iterations): # todo: might need to change based on convolution
+def spectral_normalization(filter, power_iterations):
     # Vector is preserved after each SGD iteration, good performance with power_iter=1 and presenving.
     # Need to make v trainable, and stop gradient descent to going through this path/variables.
     # Isotropic gaussian.
@@ -174,7 +173,7 @@ def spectral_normalization(filter, power_iterations): # todo: might need to chan
     v_norm = None
 
     for i in range(power_iterations):
-        v_iter = torch.matmul(u_norm, torch.t(filter_reshape)) # todo: check the shape of the tensor for transposition
+        v_iter = torch.matmul(u_norm, torch.t(filter_reshape))
         v_norm = torch.nn.functional.normalize(v_iter, p=2, eps=1e-12)
         u_iter = torch.matmul(v_norm, filter_reshape)
         u_norm = torch.nn.functional.normalize(u_iter, p=2, eps=1e-12)
@@ -195,16 +194,8 @@ def spectral_normalization(filter, power_iterations): # todo: might need to chan
     The kernel of the conv it's a variable it self, with its dependencies.
     '''
 
-    # use torch.nograd() maybe?
-    # with tf.control_dependencies([u.assign(u_norm)]): # todo: revisit # https://www.projectpro.io/recipes/what-does-tf-control-dependencies-do
     filter_normalized = filter / singular_w
     filter_normalized = torch.reshape(filter_normalized, filter.shape)
-
-    # We can control the normalization before the executing the optimizer by runing the update of all the assign operations
-    # in the variable collection.
-    # filter_normalized = filter / singular_w
-    # filter_normalized = tf.reshape(filter_normalized, filter.shape)
-    # tf.add_to_collection('SPECTRAL_NORM_UPDATE_OPS', u.assign(u_norm))
 
     '''
     CODE TRACK SINGULAR VALUE OF WEIGHTS.
@@ -243,52 +234,40 @@ def convolutional(model, inputs, output_channels, filter_size, stride, padding, 
     else:
         weight = torch.nn.init.xavier_normal_(weight)
 
-
     # Type of convolutional operation.ssh lucky-duck-96.ida
     if conv_type == 'upscale':
         output_shape = [tf.shape(inputs)[0], current_shape[1]*2, current_shape[2]*2, output_channels]
         # Weight filter initializer.
-        weight = torch.nn.functional.pad(weight, (1, 1, 1, 1), mode='constant', value=0) # todo: check is correct # padding
+        weight = torch.nn.functional.pad(weight, (1, 1, 1, 1), mode='constant', value=0)
         weight = weight[:, :, 1:, 1:] + weight[:, :, :-1, 1:] + weight[:, :, 1:, :-1] + weight[:, :, :-1, :-1] # shifts tensor
-        if spectral: weight = spectral_normalization(weight, power_iterations) # todo: change format of stuff likely
+        if spectral: weight = spectral_normalization(weight, power_iterations)
         strides = (2, 2) # changed for pytorch
 
         # change padding type for pytorch
-        if padding=="SAME":# todo: change earlier
+        if padding=="SAME":
             if stride > 1:
-                # mimicks padding in tf
-                # todo: check if inputs.shape[1] is correct
                 padding_torch= filter_size//2
             else:
                 padding_torch = 'same'
         elif padding == "VALID":
             padding_torch = 'valid'
 
-        # Need to make sure output size is right, Just need to make weight right
-        # weight = filter, output_shape is determined by stride, padding, output_padding and kernal size, data_format is always NCHW
         output = torch.nn.functional.conv_transpose2d(input=inputs, weight=weight, stride=strides ,padding=padding_torch, output_padding=output_padding)
 
     elif conv_type == 'downscale':
         # Weight filter initializer.
-        weight = torch.nn.functional.pad(weight, (1, 1, 1, 1), mode='constant', value=0) # todo: check is correct
+        weight = torch.nn.functional.pad(weight, (1, 1, 1, 1), mode='constant', value=0)
         weight = weight[:, :, 1:, 1:] + weight[:, :, :-1, 1:] + weight[:, :, 1:, :-1] + weight[:, :, :-1, :-1] # shifts tensor
         if spectral: weight = spectral_normalization(weight, power_iterations)
         strides = (2, 2)
         # change padding type for pytorch
-        if padding=="SAME":# todo: change earlier
+        if padding=="SAME":
             if stride > 1:
-                # mimicks padding in tf
-                # todo: check if inputs.shape[1] is correct
                 padding_torch= filter_size//2
             else:
                 padding_torch = 'same'
         elif padding == "VALID":
             padding_torch = 'valid'
-
-        # calculate output padding
-        # h_comp = (inputs.shape[2] - 1) * stride[0] -2 * padding_torch + weight_shape[0] # padding may cause issues
-        # w_comp = (inputs.shape[3] - 1) * stride[0] -2 * padding_torch + weight_shape[1]
-        # output_padding = (output_shape[2] - h_comp, output_shape[3] - w_comp)# change padding type for pytorch
 
         if use_bias:
             output = torch.nn.functional.conv2d(input=inputs, weight=weight, stride=stride, padding=padding_torch, bias=bias)
@@ -301,10 +280,8 @@ def convolutional(model, inputs, output_channels, filter_size, stride, padding, 
         if spectral: weight = spectral_normalization(weight, power_iterations)
 
         # change padding type for pytorch
-        if padding=="SAME":# todo: change earlier
+        if padding=="SAME":
             if stride > 1:
-                # mimicks padding in tf
-                # todo: check if inputs.shape[1] is correct
                 padding_torch= filter_size//2
             else:
                 padding_torch = 'same'
@@ -316,24 +293,19 @@ def convolutional(model, inputs, output_channels, filter_size, stride, padding, 
     elif conv_type == 'convolutional':
         if spectral: weight = spectral_normalization(weight, power_iterations)
         # change padding type for pytorch
-        if padding=="SAME":# todo: change earlier
+        if padding=="SAME":
             if stride > 1:
                 # mimicks padding in tf
-                # todo: check if inputs.shape[1] is correct
                 padding_torch= filter_size//2
             else:
                 padding_torch = 'same'
         elif padding == "VALID":
             padding_torch = 'valid'
 
-        # calculate output padding
-        # h_comp = (inputs.shape[2] - 1) * stride -2 * padding_torch + weight_shape[0] # padding may cause issues
-        # w_comp = (inputs.shape[3] - 1) * stride -2 * padding_torch + weight_shape[1]
-        # output_padding = (output_shape[2] - h_comp, output_shape[3] - w_comp)# change padding type for pytorch
-        if use_bias:
-            output = torch.nn.functional.conv2d(input=inputs, weight=weight, stride=stride, padding=padding_torch, bias=bias)
-        else:
-            output = torch.nn.functional.conv2d(input=inputs, weight=weight, stride=stride, padding=padding_torch)
+    if use_bias:
+        output = torch.nn.functional.conv2d(input=inputs, weight=weight, stride=stride, padding=padding_torch, bias=bias)
+    else:
+        output = torch.nn.functional.conv2d(input=inputs, weight=weight, stride=stride, padding=padding_torch)
 
     if display:
         print('Conv Layer:     Scope=%15s Channels %5s Filter_size=%2s  Stride=%2s Padding=%6s Conv_type=%15s Output Shape: %s' %
@@ -491,7 +463,6 @@ def conv_mod(inputs, label, output_channels, filter_size, stride, padding, conv_
         net = dense(inputs=net, out_dim=int(inter_dim/2), scope='gamma', spectral=spectral, display=False)
         net = ReLU(net)
         style = dense(inputs=net, out_dim=input_channels, scope='beta', spectral=spectral, display=False)
-
 
         # Filter Shapes.
         if 'convolutional' in conv_type:

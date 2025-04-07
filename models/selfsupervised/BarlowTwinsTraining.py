@@ -140,8 +140,6 @@ class BarlowTwinsTraining():
         return images_trans
 
 
-
-
     # Loss Function.
     def loss(self, rep_t1, rep_t2):
         loss = cross_correlation_loss(z_a=rep_t1, z_b=rep_t2, lambda_=self.lambda_)
@@ -150,14 +148,16 @@ class BarlowTwinsTraining():
     # Load data into tensors and augment the data
     def data_loading(self, data, device):
 
-        ################### INPUTS & DATA AUGMENTATION #####################################################################################################################################
+        ################### INPUTS & DATA AUGMENTATION #################################################################
         # Inputs.
         real_images_1, real_images_2 = self.model_inputs(data)
 
         # Data augmentation layer.
-        real_images_1_t = self.data_augmentation_layer(images=real_images_1, crop=self.crop, rotation=self.rotation, flip=self.flip, g_blur=self.g_blur, g_noise=self.g_noise,
+        real_images_1_t = self.data_augmentation_layer(images=real_images_1, crop=self.crop, rotation=self.rotation,
+                                                       flip=self.flip, g_blur=self.g_blur, g_noise=self.g_noise,
                                                        color_distort=self.color_distort, sobel_filter=self.sobel_filter)
-        real_images_2_t = self.data_augmentation_layer(images=real_images_2, crop=self.crop, rotation=self.rotation, flip=self.flip, g_blur=self.g_blur, g_noise=self.g_noise,
+        real_images_2_t = self.data_augmentation_layer(images=real_images_2, crop=self.crop, rotation=self.rotation,
+                                                       flip=self.flip, g_blur=self.g_blur, g_noise=self.g_noise,
                                                        color_distort=self.color_distort, sobel_filter=self.sobel_filter)
         real_images_1_t = real_images_1_t.to(device)
         real_images_2_t = real_images_2_t.to(device)
@@ -182,15 +182,15 @@ class BarlowTwinsTraining():
         # Setup HDF5 file.
         hdf5_path = os.path.join(epoch_path, 'hdf5_epoch_%s_projected_images.h5' % epoch)
         hdf5_file = h5py.File(hdf5_path, mode='w')
-        img_storage  = hdf5_file.create_dataset(name='images',           shape=[num_samples, data.patch_h, data.patch_w, data.n_channels], dtype=np.float32)
-        conv_storage = hdf5_file.create_dataset(name='conv_features',    shape=[num_samples] + list(self.conv_space_t1.shape[1:]),     dtype=np.float32) # set these
-        h_storage    = hdf5_file.create_dataset(name='h_representation', shape=[num_samples] + list(self.h_rep_t1.shape[1:]),          dtype=np.float32)
-        z_storage    = hdf5_file.create_dataset(name='z_representation', shape=[num_samples] + list(self.z_rep_t1.shape[1:]),          dtype=np.float32)
+        img_storage  = hdf5_file.create_dataset(name='images',           shape=[num_samples, data.patch_h, data.patch_w,
+                                                                                data.n_channels], dtype=np.float32)
+        conv_storage = hdf5_file.create_dataset(name='conv_features',    shape=[num_samples] + list(self.conv_space_t1.shape[1:]), dtype=np.float32)
+        h_storage    = hdf5_file.create_dataset(name='h_representation', shape=[num_samples] + list(self.h_rep_t1.shape[1:]), dtype=np.float32)
+        z_storage    = hdf5_file.create_dataset(name='z_representation', shape=[num_samples] + list(self.z_rep_t1.shape[1:]), dtype=np.float32)
 
         subsample_dataloader = DataLoader(data.training, batch_size=batch_size, shuffle=False, num_workers=0,
                                       pin_memory=True)
         data_iter = iter(subsample_dataloader)
-
 
         ind = 0
         while ind<num_samples:
@@ -205,7 +205,6 @@ class BarlowTwinsTraining():
             z_rep_out = z_rep_out.detach().to("cpu")
 
             real_images_1_t1 = real_images_1_t1.detach().to("cpu")
-            # images_batch = images_batch.permute(0, 3, 1, 2)
 
             img_storage[ind: ind+batch_size, :, : ,:]  = images_batch
             conv_storage[ind: ind+batch_size, :] = conv_space_out.detach()
@@ -239,10 +238,9 @@ class BarlowTwinsTraining():
         device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         # Set GPU memory management similar to TensorFlow
-        torch.backends.cudnn.benchmark = True  # Optimizes performance for fixed input sizes
-        torch.backends.cudnn.enabled = True # Enables cuDNN acceleration (if available)
-        # Prevent PyTorch from allocating all GPU memory at once (equivalent to TF's allow_growth)
-        torch.cuda.empty_cache()  # Clears unused cached memory
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cudnn.enabled = True
+        torch.cuda.empty_cache()
 
         # Create Model
         model = BarlowTwins.RepresentationsPathology(z_dim=self.z_dim, beta_1=self.beta_1, learning_rate_e=self.learning_rate_e, temperature=self.temperature,
@@ -253,7 +251,6 @@ class BarlowTwinsTraining():
 
         run_epochs = 0
         torch.save(model, 'model_weights.pth')
-
 
         try:
             # checkpoints, csvs = setup_output(data_out_path=data_out_path, model_name=self.model_name, restore=restore)
@@ -266,7 +263,7 @@ class BarlowTwinsTraining():
             opt = torch.optim.Adam(params=model_params, lr=self.learning_rate_e, betas=(self.beta_1, 0.999))
             # Learning rate decay.
             lr_decayed_fn = torch.optim.lr_scheduler.PolynomialLR(optimizer=opt, total_iters=3*self.num_samples,
-                                                                  power= 0.5) # todo: look at diff in parameters
+                                                                  power= 0.5)
 
             print('Starting run.')
 
@@ -280,11 +277,9 @@ class BarlowTwinsTraining():
                 model.load_state_dict(torch.load('model_weights.pth', weights_only=True)) # might be wrong
                 print('Restored model: %s' % check)
 
-
             train_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=0, pin_memory=True)
 
             i = 0
-
             # Epoch Iteration.
             for epoch in range(1):
                 if self.wandb_flag:
@@ -299,7 +294,7 @@ class BarlowTwinsTraining():
                     # show first transformation of images
                     if epoch == 0:
                         if i == 0:
-                            # transform the images # todo: put in if in first loop
+                            # transform the images
                             real_images_1_t = real_images_1.permute(0, 2, 3, 1)
                             real_images_2_t = real_images_2.permute(0, 2, 3, 1)
                             write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_1.png'),
@@ -307,7 +302,7 @@ class BarlowTwinsTraining():
                             write_sprite_image(filename=os.path.join(data_out_path, 'images/transformed_2.png'),
                                                data=real_images_2_t, metadata=False)
 
-                            if self.wandb_flag:  # todo: fix me
+                            if self.wandb_flag:
                                 dict_ = {"transformed_1": wandb.Image(
                                     os.path.join(data_out_path, 'images/transformed_1.png')),
                                          "transformed_2": wandb.Image(
@@ -340,7 +335,7 @@ class BarlowTwinsTraining():
                     with torch.no_grad():
                         val_dataloader = DataLoader(data.validation, batch_size=self.batch_size, shuffle=False, num_workers=0, pin_memory=True)
 
-                        for batch_images, batch_labels in val_dataloader: # todo: unsure if validation is corrrect
+                        for batch_images, batch_labels in val_dataloader:
                                 eval_images_1, eval_images_2 = self.data_loading(batch_images, device)
 
                                 # Model forward pass
@@ -361,7 +356,6 @@ class BarlowTwinsTraining():
                 # Save checkpoint and generate images for FID every X epochs.
                 # if (checkpoint_every is not None and epoch % checkpoint_every == 0) or (epochs==epoch):
                 self.project_subsample(device=device, model=model, data=data, epoch=epoch, data_out_path=data_out_path, report=report)
-
 
         except RuntimeError as e:
             if "CUDA out of memory" in str(e):

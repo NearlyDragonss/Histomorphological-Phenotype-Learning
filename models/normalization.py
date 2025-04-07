@@ -15,20 +15,24 @@ def batch_norm(inputs, training, c=None, spectral=False, scope=False):
 	output = batch(inputs)
 	return output
 
+
 def instance_norm(inputs, training, c=None, spectral=False, scope=False):
 	# Not used: training
 	output = tf.contrib.layers.instance_norm(inputs=inputs)
 	return output
+
 
 def layer_norm(inputs, training, c=None, spectral=False, scope=False):
 	# Not used: training
 	output = tf.contrib.layers.layer_norm(inputs=inputs, scope='layer_norm_%s' % scope)
 	return output
 
+
 def group_norm(inputs, training, c=None, spectral=False, scope=False):
 	# Not used: training
 	output = tf.contrib.layers.group_norm(inputs=inputs)
 	return output
+
 
 def conditional_instance_norm(inputs, training, c, scope, spectral=False):
 	input_dims = inputs.shape.as_list()
@@ -60,6 +64,7 @@ def conditional_instance_norm(inputs, training, c, scope, spectral=False):
 		batch_norm_output = tf.nn.batch_normalization(inputs, batch_mean, batch_variance, beta, gamma, epsilon)
 
 	return batch_norm_output
+
 
 def conditional_batch_norm(inputs, training, c, scope, spectral=False):
 	input_dims = inputs.shape.as_list()

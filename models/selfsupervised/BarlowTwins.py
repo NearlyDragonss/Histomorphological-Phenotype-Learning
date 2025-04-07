@@ -24,7 +24,6 @@ class RepresentationsPathology(nn.Module):
                  model_name='RepresentationsPathology'  # Model Name.
                  ):
         super(RepresentationsPathology, self).__init__()
-        # todo: reorder these
         self.relu = nn.ReLU()
         self.model_name = model_name
         self.attention = attention
@@ -60,11 +59,14 @@ class RepresentationsPathology(nn.Module):
         conv_space, h_rep, z_rep = self.encoder.forward(model=self, images=images, is_train=is_train)
         return conv_space, h_rep, z_rep
 
+
     def set_weight(self, weight):
         self.weight = nn.Parameter(weight)
 
+
     def set_bias(self, bias):
         self.bias = nn.Parameter(bias)
+
 
     def set_gamma(self, gamma):
         self.gamma = nn.Parameter(gamma)
