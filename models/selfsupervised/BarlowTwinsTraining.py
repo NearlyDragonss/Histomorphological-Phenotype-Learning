@@ -182,16 +182,21 @@ class BarlowTwinsTraining():
         # Setup HDF5 file.
         hdf5_path = os.path.join(epoch_path, 'hdf5_epoch_%s_projected_images.h5' % epoch)
         hdf5_file = h5py.File(hdf5_path, mode='w')
-        img_storage  = hdf5_file.create_dataset(name='images',           shape=[num_samples, data.n_channels, data.patch_h, data.patch_w], dtype=np.float32)
+        img_storage  = hdf5_file.create_dataset(name='images',           shape=[num_samples, data.patch_h, data.patch_w, data.n_channels], dtype=np.float32)
         conv_storage = hdf5_file.create_dataset(name='conv_features',    shape=[num_samples] + list(self.conv_space_t1.shape[1:]),     dtype=np.float32) # set these
         h_storage    = hdf5_file.create_dataset(name='h_representation', shape=[num_samples] + list(self.h_rep_t1.shape[1:]),          dtype=np.float32)
         z_storage    = hdf5_file.create_dataset(name='z_representation', shape=[num_samples] + list(self.z_rep_t1.shape[1:]),          dtype=np.float32)
 
+        subsample_dataloader = DataLoader(data.training, batch_size=batch_size, shuffle=False, num_workers=0,
+                                      pin_memory=True)
+        data_iter = iter(subsample_dataloader)
+
+
         ind = 0
         while ind<num_samples:
-            images_batch = data.training.images[self.selected_indx[ind: ind+batch_size], :, :, :]
+            images_batch, _ = next(data_iter)
             real_images_1_t1, _ = self.data_loading(images_batch, device)
-            
+
 
             # Model forward pass
             conv_space_out, h_rep_out, z_rep_out = model.forward(real_images_1_t1, True)
@@ -200,7 +205,7 @@ class BarlowTwinsTraining():
             z_rep_out = z_rep_out.detach().to("cpu")
 
             real_images_1_t1 = real_images_1_t1.detach().to("cpu")
-            images_batch = images_batch.transpose(0, 3, 1, 2)
+            # images_batch = images_batch.permute(0, 3, 1, 2)
 
             img_storage[ind: ind+batch_size, :, : ,:]  = images_batch
             conv_storage[ind: ind+batch_size, :] = conv_space_out.detach()
@@ -276,12 +281,12 @@ class BarlowTwinsTraining():
                 print('Restored model: %s' % check)
 
 
-            train_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=0, multiprocessing_context='forkserver', pin_memory=True)
+            train_dataloader = DataLoader(data.training, batch_size=self.batch_size, shuffle=False, num_workers=0, pin_memory=True)
 
             i = 0
 
             # Epoch Iteration.
-            for epoch in range(0, epochs+1):
+            for epoch in range(1):
                 if self.wandb_flag:
                     wandb.log({'Epoch': epoch+1})
                 # Batch Iteration.
@@ -329,34 +334,33 @@ class BarlowTwinsTraining():
                     ####################################################################################################
                     # Print losses and Generate samples.
                     model.eval() # set in validation mode
-                    if run_epochs % print_epochs == 0:
-                        epoch_outputs = loss_contrastive.item()
+                    # if run_epochs % print_epochs == 0:
+                    epoch_outputs = loss_contrastive.item()
 
-                        with torch.no_grad():
-                            val_dataloader = DataLoader(data.validation, batch_size=self.batch_size, shuffle=False, num_workers=0, multiprocessing_context='forkserver', pin_memory=True)
+                    with torch.no_grad():
+                        val_dataloader = DataLoader(data.validation, batch_size=self.batch_size, shuffle=False, num_workers=0, pin_memory=True)
 
-                            for batch_images, batch_labels in val_dataloader: # todo: unsure if validation is corrrect
-                                    eval_images_1, eval_images_2 = self.data_loading(batch_images, device)
+                        for batch_images, batch_labels in val_dataloader: # todo: unsure if validation is corrrect
+                                eval_images_1, eval_images_2 = self.data_loading(batch_images, device)
 
-                                    # Model forward pass
-                                    self.conv_space_t1, self.h_rep_t1, self.z_rep_t1 =  model.forward(eval_images_1, False)
-                                    conv_space_t2, h_rep_t2, z_rep_t2 =  model.forward(eval_images_2, False)
+                                # Model forward pass
+                                self.conv_space_t1, self.h_rep_t1, self.z_rep_t1 =  model.forward(eval_images_1, False)
+                                conv_space_t2, h_rep_t2, z_rep_t2 =  model.forward(eval_images_2, False)
 
-                                    loss_contrastive = self.loss(rep_t1=self.z_rep_t1, rep_t2=z_rep_t2)
+                                loss_contrastive = self.loss(rep_t1=self.z_rep_t1, rep_t2=z_rep_t2)
 
-                                    val_outputs = loss_contrastive
+                                val_outputs = loss_contrastive
 
-                                    # update_csv(model=self, file=csvs[0], variables=[epoch_outputs, val_outputs], epoch=epoch, iteration=run_epochs, losses=losses)
-                                    if self.wandb_flag: wandb.log({'Redundancy Reduction Loss Train': epoch_outputs, 'Redundancy Reduction Loss Validation': val_outputs})
-                                    break
+                                # update_csv(model=self, file=csvs[0], variables=[epoch_outputs, val_outputs], epoch=epoch, iteration=run_epochs, losses=losses)
+                                if self.wandb_flag: wandb.log({'Redundancy Reduction Loss Train': epoch_outputs, 'Redundancy Reduction Loss Validation': val_outputs})
+                                break
                 # Save model.
                 torch.save(model.state_dict(), 'model_weights.pth')
-                data.training.reset()
 
                 ############################### FID TRACKING ##################################################
                 # Save checkpoint and generate images for FID every X epochs.
-                if (checkpoint_every is not None and epoch % checkpoint_every == 0) or (epochs==epoch):
-                    self.project_subsample(device=device, model=model, data=data, epoch=epoch, data_out_path=data_out_path, report=report)
+                # if (checkpoint_every is not None and epoch % checkpoint_every == 0) or (epochs==epoch):
+                self.project_subsample(device=device, model=model, data=data, epoch=epoch, data_out_path=data_out_path, report=report)
 
 
         except RuntimeError as e:

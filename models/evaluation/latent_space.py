@@ -161,7 +161,6 @@ def plot_latent_space(embedding, images, img_path, field_names, file_name, label
     gs_kw = dict(width_ratios=widths, height_ratios=heights)
     plt.ioff()
     fig6, f6_axes = plt.subplots(figsize=figsize, ncols=n_cells, nrows=n_cells, gridspec_kw=gs_kw)
-
     # Remove label ticks from image subplots.
     for ax_row in f6_axes:
         for ax in ax_row:
@@ -219,7 +218,6 @@ def plot_latent_space(embedding, images, img_path, field_names, file_name, label
         cax = divider.append_axes('right', size='5%', pad=0.05)
         cbar = plt.colorbar(a, cax)
         cbar.ax.tick_params(labelsize=size-8)
-
         # Regions of interest for images.
     x_c = (x_lim[0] + x_lim[1])/2.
     y_c = (y_lim[0] + y_lim[1])/2.
@@ -236,7 +234,6 @@ def plot_latent_space(embedding, images, img_path, field_names, file_name, label
 
     # Pull closest representations to points in rois.
     rois_img = git_gmm_roi_images(gmm, embedding, images, rois)
-
     # Plot images of regions of interest.
     for roi_i, m_img in enumerate(rois_img):
         img, mean = m_img
@@ -256,7 +253,6 @@ def plot_latent_space(embedding, images, img_path, field_names, file_name, label
         if len(img.shape) == 5:
             img = img[:, 0, :, :, :]
         if np.max(img)< 2: img = img*255.
-
         # Plot combined images.
         combined_img = combine_images(img)
         if combined_img.shape[-1] == 1:
@@ -283,7 +279,6 @@ def plot_latent_space(embedding, images, img_path, field_names, file_name, label
         con = ConnectionPatch(xyA=mean, xyB=box_coor, coordsA="data", coordsB="data", axesA=main_ax, axesB=axesA, color=color, arrowstyle="-", zorder=0)
         con = ConnectionPatch(xyA=mean, xyB=box_coor, coordsA="data", coordsB="data", axesA=main_ax, axesB=axesA, color=color, arrowstyle="-", zorder=0)
         main_ax.add_artist(con)
-
     plt.tight_layout()
     image_path = '%s/%s.jpg' % (img_path, file_name)
     plt.savefig(image_path)
@@ -297,10 +292,8 @@ def report_progress_latent(epoch, w_samples, img_samples, img_path, label_sample
     from sklearn import mixture
     import umap
     import random
-
     reducer = umap.UMAP(n_neighbors=30, min_dist=0.0, n_components=2, random_state=42, low_memory=True, metric=metric)
     embedding_umap = reducer.fit_transform(w_samples)
-
     for radius in [0.11, 0.25, 0.51, 0.61, 0.75, 1.01, 1.25, 1.51]:
         if label_samples is not None:
             labels = label_samples[:, 0]
@@ -309,7 +302,6 @@ def report_progress_latent(epoch, w_samples, img_samples, img_path, label_sample
         n_components = 1000
         image_path, rois, x_lim, y_lim = plot_latent_space(embedding=embedding_umap, images=img_samples, img_path=img_path, field_names=None, file_name='%s_epoch_%s_images_latent_space_%s'% (storage_name, epoch, str(radius).replace('.', 'p')),
                                                            labels=labels, gmm_components=n_components, legend_title=None, radius_rate=radius, scatter_plot=True, size=20, figsize=(20,20), x_lim=None, y_lim=None, cmap='Spectral')
-
     label_image_path = None
     if label_samples is not None:
         clusters = list(range(np.max(label_samples)+1))
@@ -329,6 +321,5 @@ def report_progress_latent(epoch, w_samples, img_samples, img_path, label_sample
                                                            labels=class_labels, legend_title=None, radius_rate=radius, scatter_plot=True, size=20, figsize=(20,20), x_lim=x_lim, y_lim=y_lim, cmap='Spectral')
             except:
                 print('Issue with cluster %s in epoch %s' % (i, epoch))
-
     return image_path, label_image_path
 

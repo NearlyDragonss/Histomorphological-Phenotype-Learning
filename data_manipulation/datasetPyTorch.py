@@ -59,6 +59,34 @@ class DatasetPyTorch(Dataset):
             size = hdf5_file[image_name].shape[0]
         return image_name, labels_name, size
 
+    def get_hdf5_data(self):
+        hdf5_file = h5py.File(self.hdf5_path, 'r')
+
+        # Legacy code for initial naming of images, label keys.
+        labels_name = self.labels_name
+        naming = list(hdf5_file.keys())
+        if 'images' in naming:
+            image_name = 'images'
+            if labels_name is None:
+                labels_name = 'labels'
+        else:
+            for naming in list(hdf5_file.keys()):
+                if 'img' in naming or 'image' in naming:
+                    image_name = naming
+                elif 'labels' in naming and self.labels_name is None:
+                    labels_name = naming
+
+        # Get images, labels, and embeddings if neccesary.
+        images    = hdf5_file[image_name]
+        embedding = None
+        labels    = np.zeros((images.shape[0]))
+        if self.labels_flag:
+            if self.labels_name == 'inception' or self.labels_name == 'self':
+                labels, embedding = inception_feature_labels(self.hdf5_path, image_name, self.patch_h, self.patch_w, self.n_channels, self.num_clusters, self.clust_percent, set_type=self.labels_name)
+                labels, embedding = inception_feature_labels(self.hdf5_path, image_name, self.patch_h, self.patch_w, self.n_channels, self.num_clusters, self.clust_percent, set_type=self.labels_name)
+            else:
+                labels = hdf5_file[labels_name]
+        return images, labels, embedding
 
     def __len__(self):
 

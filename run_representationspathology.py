@@ -46,7 +46,6 @@ check_every    = args.check_every
 restore        = args.restore
 report         = args.report
 
-
 # Main paths for data output and databases.
 if main_path is None:
 	main_path = os.path.dirname(os.path.realpath(__file__))
@@ -94,7 +93,6 @@ elif 'BarlowTwins' in model:
 elif 'DINO' in model:
 	from models.selfsupervised.DINO import RepresentationsPathology
 
-print("hello")
 
 # Collect dataset.
 data = Data(dataset=dataset, marker=marker, patch_h=image_height, patch_w=image_width, n_channels=image_channels, batch_size=batch_size, project_path=dbs_path)
